@@ -1,0 +1,29 @@
+﻿using System;
+using System.Collections.Generic;
+
+namespace BlokuGrandiniuSistema.Models;
+
+public partial class b_user
+{
+    public int UserId { get; set; }
+
+    public string Username { get; set; } = null!;
+
+    public string Email { get; set; } = null!;
+
+    public string PasswordHash { get; set; } = null!;
+
+    public int RoleId { get; set; }
+
+    public string? avatar { get; set; }
+
+    public string? firstname { get; set; }
+
+    public string? lastname { get; set; }
+
+    public virtual b_role Role { get; set; } = null!;
+
+    public virtual ICollection<b_inquiry> b_inquiries { get; set; } = new List<b_inquiry>();
+
+    public virtual ICollection<b_listing> b_listings { get; set; } = new List<b_listing>();
+}

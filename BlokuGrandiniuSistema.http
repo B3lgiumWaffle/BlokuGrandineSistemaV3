@@ -1,0 +1,6 @@
+@BlokuGrandiniuSistema_HostAddress = http://localhost:5217
+
+GET {{BlokuGrandiniuSistema_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

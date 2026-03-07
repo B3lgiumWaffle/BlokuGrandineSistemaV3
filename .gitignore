@@ -32,3 +32,4 @@ frontend/build/
 # =========================
 .DS_Store
 Thumbs.db
+blockchain/.env

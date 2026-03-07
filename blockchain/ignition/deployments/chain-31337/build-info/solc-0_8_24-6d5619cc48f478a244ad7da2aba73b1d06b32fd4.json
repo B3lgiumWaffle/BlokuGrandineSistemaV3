@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_24-6d5619cc48f478a244ad7da2aba73b1d06b32fd4",
+  "solcVersion": "0.8.24",
+  "solcLongVersion": "0.8.24+commit.e11b9ed9",
+  "userSourceNameMap": {
+    "contracts/MilestoneEscrow.sol": "project/contracts/MilestoneEscrow.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "shanghai",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/MilestoneEscrow.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.24;\r\n\r\ncontract MilestoneEscrow {\r\n    uint256 public projectCounter;\r\n\r\n    struct Project {\r\n        address client;\r\n        address provider;\r\n        uint256 totalAmountWei;\r\n        uint256 milestoneCount;\r\n        uint256 milestoneAmountWei;\r\n        uint256 releasedCount;\r\n        bool funded;\r\n        bool exists;\r\n    }\r\n\r\n    mapping(uint256 => Project) public projects;\r\n    mapping(uint256 => mapping(uint256 => bool)) public milestoneReleased;\r\n\r\n    event ProjectCreated(\r\n        uint256 indexed projectId,\r\n        address indexed client,\r\n        address indexed provider,\r\n        uint256 totalAmountWei,\r\n        uint256 milestoneCount,\r\n        uint256 milestoneAmountWei\r\n    );\r\n\r\n    event ProjectFunded(\r\n        uint256 indexed projectId,\r\n        uint256 totalAmountWei\r\n    );\r\n\r\n    event MilestoneReleased(\r\n        uint256 indexed projectId,\r\n        uint256 indexed milestoneIndex,\r\n        uint256 amountWei\r\n    );\r\n\r\n    modifier onlyClient(uint256 projectId) {\r\n        require(projects[projectId].exists, \"Project does not exist\");\r\n        require(msg.sender == projects[projectId].client, \"Only client can call\");\r\n        _;\r\n    }\r\n\r\n    function createProject(\r\n        address provider,\r\n        uint256 milestoneCount\r\n    ) external payable returns (uint256) {\r\n        require(provider != address(0), \"Invalid provider\");\r\n        require(provider != msg.sender, \"Client and provider must differ\");\r\n        require(milestoneCount > 0, \"Milestone count must be > 0\");\r\n        require(msg.value > 0, \"Funding is required\");\r\n        require(msg.value % milestoneCount == 0, \"ETH must divide equally by milestones\");\r\n\r\n        projectCounter += 1;\r\n\r\n        uint256 milestoneAmountWei = msg.value / milestoneCount;\r\n\r\n        projects[projectCounter] = Project({\r\n            client: msg.sender,\r\n            provider: provider,\r\n            totalAmountWei: msg.value,\r\n            milestoneCount: milestoneCount,\r\n            milestoneAmountWei: milestoneAmountWei,\r\n            releasedCount: 0,\r\n            funded: true,\r\n            exists: true\r\n        });\r\n\r\n        emit ProjectCreated(\r\n            projectCounter,\r\n            msg.sender,\r\n            provider,\r\n            msg.value,\r\n            milestoneCount,\r\n            milestoneAmountWei\r\n        );\r\n\r\n        emit ProjectFunded(projectCounter, msg.value);\r\n\r\n        return projectCounter;\r\n    }\r\n\r\n    function releaseMilestone(\r\n        uint256 projectId,\r\n        uint256 milestoneIndex\r\n    ) external onlyClient(projectId) {\r\n        Project storage p = projects[projectId];\r\n\r\n        require(p.funded, \"Project is not funded\");\r\n        require(milestoneIndex < p.milestoneCount, \"Invalid milestone index\");\r\n        require(!milestoneReleased[projectId][milestoneIndex], \"Milestone already released\");\r\n\r\n        milestoneReleased[projectId][milestoneIndex] = true;\r\n        p.releasedCount += 1;\r\n\r\n        (bool sent, ) = payable(p.provider).call{value: p.milestoneAmountWei}(\"\");\r\n        require(sent, \"ETH transfer failed\");\r\n\r\n        emit MilestoneReleased(projectId, milestoneIndex, p.milestoneAmountWei);\r\n    }\r\n\r\n    function getProject(uint256 projectId)\r\n        external\r\n        view\r\n        returns (\r\n            address client,\r\n            address provider,\r\n            uint256 totalAmountWei,\r\n            uint256 milestoneCount,\r\n            uint256 milestoneAmountWei,\r\n            uint256 releasedCount,\r\n            bool funded\r\n        )\r\n    {\r\n        Project memory p = projects[projectId];\r\n        require(p.exists, \"Project does not exist\");\r\n\r\n        return (\r\n            p.client,\r\n            p.provider,\r\n            p.totalAmountWei,\r\n            p.milestoneCount,\r\n            p.milestoneAmountWei,\r\n            p.releasedCount,\r\n            p.funded\r\n        );\r\n    }\r\n}"
+      }
+    }
+  }
+}

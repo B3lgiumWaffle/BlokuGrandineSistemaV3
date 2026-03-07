@@ -33,6 +33,8 @@ public partial class b_inquiry
 
     public bool? senderSeen { get; set; }
 
+    public virtual ICollection<b_contract> b_contracts { get; set; } = new List<b_contract>();
+
     public virtual ICollection<b_requirement> b_requirements { get; set; } = new List<b_requirement>();
 
     public virtual b_listing fk_listing { get; set; } = null!;

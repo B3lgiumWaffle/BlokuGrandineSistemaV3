@@ -15,5 +15,7 @@ public partial class b_requirement
 
     public DateOnly? forseenCompletionDate { get; set; }
 
+    public virtual ICollection<b_contract_milestone> b_contract_milestones { get; set; } = new List<b_contract_milestone>();
+
     public virtual b_inquiry fk_inquiry { get; set; } = null!;
 }

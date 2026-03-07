@@ -18,6 +18,12 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<b_category> b_categories { get; set; }
 
+    public virtual DbSet<b_completed_listing_fragment> b_completed_listing_fragments { get; set; }
+
+    public virtual DbSet<b_contract> b_contracts { get; set; }
+
+    public virtual DbSet<b_contract_milestone> b_contract_milestones { get; set; }
+
     public virtual DbSet<b_inquiry> b_inquiries { get; set; }
 
     public virtual DbSet<b_listing> b_listings { get; set; }
@@ -49,6 +55,167 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.CategoryId).HasColumnType("int(11)");
             entity.Property(e => e.Description).HasColumnType("text");
             entity.Property(e => e.Title).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<b_completed_listing_fragment>(entity =>
+        {
+            entity.HasKey(e => e.fragmentId).HasName("PRIMARY");
+
+            entity.ToTable("b_completed_listing_fragment");
+
+            entity.HasIndex(e => e.approvedByUserId, "fk_fragment_approved_by");
+
+            entity.HasIndex(e => e.submittedByUserId, "fk_fragment_submitted_by");
+
+            entity.HasIndex(e => e.fkContractId, "idx_fragment_contract");
+
+            entity.HasIndex(e => e.fkMilestoneId, "idx_fragment_milestone");
+
+            entity.HasIndex(e => e.fkRequirementId, "idx_fragment_requirement");
+
+            entity.HasIndex(e => e.status, "idx_fragment_status");
+
+            entity.Property(e => e.fragmentId).HasColumnType("int(11)");
+            entity.Property(e => e.approvedAt).HasColumnType("datetime");
+            entity.Property(e => e.approvedByUserId).HasColumnType("int(11)");
+            entity.Property(e => e.createdAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.description).HasColumnType("text");
+            entity.Property(e => e.filePath).HasMaxLength(500);
+            entity.Property(e => e.fkContractId).HasColumnType("int(11)");
+            entity.Property(e => e.fkMilestoneId).HasColumnType("int(11)");
+            entity.Property(e => e.fkRequirementId).HasColumnType("int(11)");
+            entity.Property(e => e.releaseTxHash).HasMaxLength(255);
+            entity.Property(e => e.reviewComment).HasColumnType("text");
+            entity.Property(e => e.status)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("'Submitted'");
+            entity.Property(e => e.submittedAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.submittedByUserId).HasColumnType("int(11)");
+            entity.Property(e => e.title).HasMaxLength(255);
+            entity.Property(e => e.updatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.approvedByUser).WithMany(p => p.b_completed_listing_fragmentapprovedByUsers)
+                .HasForeignKey(d => d.approvedByUserId)
+                .HasConstraintName("fk_fragment_approved_by");
+
+            entity.HasOne(d => d.fkContract).WithMany(p => p.b_completed_listing_fragments)
+                .HasForeignKey(d => d.fkContractId)
+                .HasConstraintName("fk_fragment_contract");
+
+            entity.HasOne(d => d.fkMilestone).WithMany(p => p.b_completed_listing_fragments)
+                .HasForeignKey(d => d.fkMilestoneId)
+                .HasConstraintName("fk_fragment_milestone");
+
+            entity.HasOne(d => d.submittedByUser).WithMany(p => p.b_completed_listing_fragmentsubmittedByUsers)
+                .HasForeignKey(d => d.submittedByUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_fragment_submitted_by");
+        });
+
+        modelBuilder.Entity<b_contract>(entity =>
+        {
+            entity.HasKey(e => e.contractId).HasName("PRIMARY");
+
+            entity.ToTable("b_contract");
+
+            entity.HasIndex(e => e.fkClientUserId, "idx_contract_client");
+
+            entity.HasIndex(e => e.fkInquiryId, "idx_contract_inquiry");
+
+            entity.HasIndex(e => e.fkProviderUserId, "idx_contract_provider");
+
+            entity.HasIndex(e => e.status, "idx_contract_status");
+
+            entity.Property(e => e.contractId).HasColumnType("int(11)");
+            entity.Property(e => e.agreedAmountEur).HasPrecision(18, 2);
+            entity.Property(e => e.chainProjectId).HasColumnType("bigint(20)");
+            entity.Property(e => e.clientWalletAddress).HasMaxLength(255);
+            entity.Property(e => e.createdAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.fkClientUserId).HasColumnType("int(11)");
+            entity.Property(e => e.fkInquiryId).HasColumnType("int(11)");
+            entity.Property(e => e.fkProviderUserId).HasColumnType("int(11)");
+            entity.Property(e => e.fundedAmountEth).HasPrecision(18, 8);
+            entity.Property(e => e.fundingTxHash).HasMaxLength(255);
+            entity.Property(e => e.milestoneAmountEth).HasPrecision(18, 8);
+            entity.Property(e => e.milestoneCount).HasColumnType("int(11)");
+            entity.Property(e => e.network)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("'sepolia'");
+            entity.Property(e => e.providerWalletAddress).HasMaxLength(255);
+            entity.Property(e => e.smartContractAddress).HasMaxLength(255);
+            entity.Property(e => e.status)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("'PendingFunding'");
+            entity.Property(e => e.updatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.fkClientUser).WithMany(p => p.b_contractfkClientUsers)
+                .HasForeignKey(d => d.fkClientUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_contract_client");
+
+            entity.HasOne(d => d.fkInquiry).WithMany(p => p.b_contracts)
+                .HasForeignKey(d => d.fkInquiryId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_contract_inquiry");
+
+            entity.HasOne(d => d.fkProviderUser).WithMany(p => p.b_contractfkProviderUsers)
+                .HasForeignKey(d => d.fkProviderUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_contract_provider");
+        });
+
+        modelBuilder.Entity<b_contract_milestone>(entity =>
+        {
+            entity.HasKey(e => e.milestoneId).HasName("PRIMARY");
+
+            entity.ToTable("b_contract_milestone");
+
+            entity.HasIndex(e => e.fkContractId, "idx_milestone_contract");
+
+            entity.HasIndex(e => e.fkRequirementId, "idx_milestone_requirement");
+
+            entity.HasIndex(e => e.status, "idx_milestone_status");
+
+            entity.HasIndex(e => new { e.fkContractId, e.milestoneNo }, "uq_contract_milestone_no").IsUnique();
+
+            entity.Property(e => e.milestoneId).HasColumnType("int(11)");
+            entity.Property(e => e.amountEth).HasPrecision(18, 8);
+            entity.Property(e => e.amountEurSnapshot).HasPrecision(18, 2);
+            entity.Property(e => e.createdAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.fkContractId).HasColumnType("int(11)");
+            entity.Property(e => e.fkRequirementId).HasColumnType("int(11)");
+            entity.Property(e => e.milestoneNo).HasColumnType("int(11)");
+            entity.Property(e => e.releaseTxHash).HasMaxLength(255);
+            entity.Property(e => e.releasedAt).HasColumnType("datetime");
+            entity.Property(e => e.status)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("'Pending'");
+            entity.Property(e => e.updatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.fkContract).WithMany(p => p.b_contract_milestones)
+                .HasForeignKey(d => d.fkContractId)
+                .HasConstraintName("fk_milestone_contract");
+
+            entity.HasOne(d => d.fkRequirement).WithMany(p => p.b_contract_milestones)
+                .HasForeignKey(d => d.fkRequirementId)
+                .HasConstraintName("fk_milestone_requirement");
         });
 
         modelBuilder.Entity<b_inquiry>(entity =>

@@ -89,6 +89,27 @@ export async function apiPostNoBody(path) {
     if (!res.ok) throw new Error(txt || `POST ${path} failed: ${res.status}`);
 }
 
+export async function apiPost(url, body = null) {
+    const token = localStorage.getItem("token");
+
+    const response = await fetch(`https://localhost:7278${url}`, {
+        method: "POST",
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(body ? { "Content-Type": "application/json" } : {})
+        },
+        body: body ? JSON.stringify(body) : null
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Request failed");
+    }
+
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+}
+
 
 //Atkomentuoti jei nuluz o virsuj istinrit. cia sitas veike su nuotraukom kai buvo pradzia
 //const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";

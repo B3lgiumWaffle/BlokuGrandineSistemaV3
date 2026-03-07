@@ -1,18 +1,76 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import {
-    Box, Button, CircularProgress, Container, Divider, Paper, Stack, Typography, Chip,
-    Grid, TextField, IconButton, InputAdornment
+    Box,
+    Button,
+    CircularProgress,
+    Container,
+    Divider,
+    Paper,
+    Stack,
+    Typography,
+    Chip,
+    Grid,
+    TextField,
+    IconButton,
+    InputAdornment
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiDelete, apiPutFormData, apiPostNoBody } from "../api/api";
+import { apiGet, apiDelete, apiPutFormData, apiPostNoBody, apiPost } from "../api/api";
 
 const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";
+
+function money(v) {
+    if (v == null || v === "") return "—";
+    const n = Number(v);
+    return Number.isNaN(n) ? "—" : `€${n.toFixed(2)}`;
+}
+
+function safeDate(v) {
+    if (!v) return "—";
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
+}
+
+function getInquiryStatusMeta(status, isConfirmed) {
+    const s = String(status ?? "").toUpperCase();
+
+    if (s === "ACCEPTED" || isConfirmed) {
+        return { label: "Accepted", color: "success", variant: "filled" };
+    }
+
+    if (s === "PENDING") {
+        return { label: "Pending", color: "default", variant: "outlined" };
+    }
+
+    if (s === "FUNDED") {
+        return { label: "Funded", color: "primary", variant: "filled" };
+    }
+
+    if (s === "IN_PROGRESS") {
+        return { label: "In Progress", color: "warning", variant: "filled" };
+    }
+
+    if (s === "COMPLETED") {
+        return { label: "Completed", color: "success", variant: "filled" };
+    }
+
+    if (s === "CANCELLED") {
+        return { label: "Cancelled", color: "error", variant: "outlined" };
+    }
+
+    return {
+        label: isConfirmed ? "Accepted" : "Pending",
+        color: isConfirmed ? "success" : "default",
+        variant: isConfirmed ? "filled" : "outlined",
+    };
+}
 
 function normalize(raw) {
     const x = raw?.item ?? raw?.data ?? raw ?? {};
     const reqs = x.requirements ?? x.Requirements ?? [];
+
     return {
         inquiryId: x.inquiryId ?? x.InquiryId ?? x.id,
         listingTitle: x.listingTitle ?? x.ListingTitle ?? "Untitled listing",
@@ -20,6 +78,8 @@ function normalize(raw) {
         proposedSum: x.proposedSum ?? x.ProposedSum ?? null,
         description: x.description ?? x.Description ?? "",
         creationDate: x.creationDate ?? x.CreationDate ?? null,
+        isConfirmed: x.isConfirmed ?? x.IsConfirmed ?? false,
+        status: x.status ?? x.Status ?? "PENDING",
         lastModifiedBy: x.lastModifiedBy ?? x.LastModifiedBy ?? null,
         senderSeen: x.senderSeen ?? x.SenderSeen ?? true,
         requirements: (Array.isArray(reqs) ? reqs : []).map(r => ({
@@ -30,9 +90,6 @@ function normalize(raw) {
         }))
     };
 }
-
-function money(v) { if (v == null || v === "") return "—"; const n = Number(v); return Number.isNaN(n) ? "—" : `€${n.toFixed(2)}`; }
-function safeDate(v) { if (!v) return "—"; const d = new Date(v); return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString(); }
 
 function newReq() {
     return { requirementId: null, description: "", forseenCompletionDate: "", existingFileUrl: null, file: null };
@@ -53,6 +110,8 @@ export default function SentInquiryDetails() {
     const [draftReqs, setDraftReqs] = useState([newReq()]);
     const [saving, setSaving] = useState(false);
 
+    const statusMeta = getInquiryStatusMeta(item?.status, item?.isConfirmed);
+
     const reload = async () => {
         const data = await apiGet(`/api/inquiries/${id}`);
         const n = normalize(data);
@@ -70,18 +129,22 @@ export default function SentInquiryDetails() {
             }))
         );
 
-        // mark seen if updated by owner
         if (n.lastModifiedBy === "OWNER" && !n.senderSeen) {
             await apiPostNoBody(`/api/inquiries/${id}/seen-sender`);
         }
     };
 
     useEffect(() => {
-        if (!token) { navigate("/login"); return; }
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+
         let alive = true;
         (async () => {
             try {
-                setLoading(true); setErr("");
+                setLoading(true);
+                setErr("");
                 await reload();
                 if (!alive) return;
             } catch (e) {
@@ -92,13 +155,17 @@ export default function SentInquiryDetails() {
                 setLoading(false);
             }
         })();
-        return () => { alive = false; };
+
+        return () => {
+            alive = false;
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, navigate, token]);
 
     const onDecline = async () => {
         const ok = window.confirm(`Decline inquiry #${id}? This will delete it.`);
         if (!ok) return;
+
         try {
             await apiDelete(`/api/inquiries/${id}`);
             alert("Inquiry declined (deleted).");
@@ -111,8 +178,16 @@ export default function SentInquiryDetails() {
     const onAccept = async () => {
         try {
             await apiPostNoBody(`/api/inquiries/${id}/accept-sender`);
+
+            let contract;
+            try {
+                contract = await apiGet(`/api/contracts/by-inquiry/${id}`);
+            } catch {
+                contract = await apiPost(`/api/contracts/from-inquiry/${id}`);
+            }
+
             alert("Accepted.");
-            await reload();
+            navigate(`/contracts/${contract.contractId}`);
         } catch (e) {
             alert(e?.message ?? "Accept failed");
         }
@@ -125,13 +200,15 @@ export default function SentInquiryDetails() {
         if (item) {
             setDraftPrice(item.proposedSum ?? "");
             setDraftDesc(item.description ?? "");
-            setDraftReqs(item.requirements.map(r => ({
-                requirementId: r.requirementId,
-                description: r.description ?? "",
-                forseenCompletionDate: r.forseenCompletionDate ?? "",
-                existingFileUrl: r.fileUrl ?? null,
-                file: null
-            })));
+            setDraftReqs(
+                (item.requirements?.length ? item.requirements : [newReq()]).map(r => ({
+                    requirementId: r.requirementId,
+                    description: r.description ?? "",
+                    forseenCompletionDate: r.forseenCompletionDate ?? "",
+                    existingFileUrl: r.fileUrl ?? null,
+                    file: null
+                }))
+            );
         }
     };
 
@@ -142,7 +219,8 @@ export default function SentInquiryDetails() {
     const addReq = () => setDraftReqs(prev => [...prev, newReq()]);
     const removeReq = (idx) => setDraftReqs(prev => prev.filter((_, i) => i !== idx));
 
-    const canAccept = item?.lastModifiedBy === "OWNER";
+    // Sender gali accept tik jei paskutinis modifikavo OWNER ir dar nėra confirmed
+    const canAccept = item?.lastModifiedBy === "OWNER" && !item?.isConfirmed;
 
     const canSave =
         draftDesc.trim().length > 0 &&
@@ -154,16 +232,28 @@ export default function SentInquiryDetails() {
             setSaving(true);
             const fd = new FormData();
 
-            if (draftPrice !== "" && draftPrice != null) fd.append("ProposedSum", String(draftPrice));
+            if (draftPrice !== "" && draftPrice != null) {
+                fd.append("ProposedSum", String(draftPrice));
+            }
+
             fd.append("Description", draftDesc ?? "");
 
             draftReqs.forEach((r, i) => {
-                if (r.requirementId != null) fd.append(`Requirements[${i}].RequirementId`, String(r.requirementId));
-                fd.append(`Requirements[${i}].Description`, r.description ?? "");
-                if (r.forseenCompletionDate) fd.append(`Requirements[${i}].ForseenCompletionDate`, r.forseenCompletionDate);
+                if (r.requirementId != null) {
+                    fd.append(`Requirements[${i}].RequirementId`, String(r.requirementId));
+                }
 
-                if (r.file) fd.append(`Requirements[${i}].File`, r.file);
-                else if (r.existingFileUrl) fd.append(`Requirements[${i}].ExistingFileUrl`, r.existingFileUrl);
+                fd.append(`Requirements[${i}].Description`, r.description ?? "");
+
+                if (r.forseenCompletionDate) {
+                    fd.append(`Requirements[${i}].ForseenCompletionDate`, r.forseenCompletionDate);
+                }
+
+                if (r.file) {
+                    fd.append(`Requirements[${i}].File`, r.file);
+                } else if (r.existingFileUrl) {
+                    fd.append(`Requirements[${i}].ExistingFileUrl`, r.existingFileUrl);
+                }
             });
 
             await apiPutFormData(`/api/inquiries/${id}/sender`, fd);
@@ -185,14 +275,18 @@ export default function SentInquiryDetails() {
             </Stack>
 
             {loading ? (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}><CircularProgress /></Box>
+                <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                    <CircularProgress />
+                </Box>
             ) : err ? (
                 <Paper sx={{ p: 2, borderRadius: 3 }}>
                     <Typography sx={{ fontWeight: 800 }}>Error</Typography>
                     <Typography sx={{ opacity: 0.8 }}>{err}</Typography>
                 </Paper>
             ) : !item ? (
-                <Paper sx={{ p: 2, borderRadius: 3 }}><Typography sx={{ fontWeight: 800 }}>Not found</Typography></Paper>
+                <Paper sx={{ p: 2, borderRadius: 3 }}>
+                    <Typography sx={{ fontWeight: 800 }}>Not found</Typography>
+                </Paper>
             ) : (
                 <Paper sx={{ p: 2.5, borderRadius: 3 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
@@ -202,12 +296,16 @@ export default function SentInquiryDetails() {
                                 {item.listingTitle} • Created: {safeDate(item.creationDate)}
                             </Typography>
                         </Box>
+
                         <Stack direction="row" spacing={1} alignItems="center">
                             <Chip label={`Offer: ${money(item.proposedSum)}`} variant="outlined" />
-                            {(item.lastModifiedBy === "OWNER" && !item.senderSeen) ? (
+                            <Chip
+                                label={statusMeta.label}
+                                color={statusMeta.color}
+                                variant={statusMeta.variant}
+                            />
+                            {(item.lastModifiedBy === "OWNER" && !item.senderSeen && !item.isConfirmed) && (
                                 <Chip label="Updated" color="warning" />
-                            ) : (
-                                <Chip label="Seen" variant="outlined" />
                             )}
                         </Stack>
                     </Stack>
@@ -217,49 +315,75 @@ export default function SentInquiryDetails() {
                     {!isEditing ? (
                         <>
                             <Typography sx={{ fontWeight: 900, mb: 0.5 }}>Description</Typography>
-                            <Typography sx={{ whiteSpace: "pre-wrap", opacity: 0.92 }}>{item.description || "—"}</Typography>
+                            <Typography sx={{ whiteSpace: "pre-wrap", opacity: 0.92 }}>
+                                {item.description || "—"}
+                            </Typography>
 
                             <Divider sx={{ my: 2 }} />
 
                             <Typography sx={{ fontWeight: 900, mb: 1 }}>Requirements</Typography>
-                            <Stack spacing={1.2}>
-                                {item.requirements.map(r => (
-                                    <Paper key={r.requirementId} variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
-                                        <Typography sx={{ fontWeight: 800 }}>Requirement #{r.requirementId}</Typography>
-                                        <Typography sx={{ whiteSpace: "pre-wrap", mt: 0.5 }}>{r.description || "—"}</Typography>
-                                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mt: 1 }}>
-                                            <Chip size="small" variant="outlined" label={`Wanted date: ${r.forseenCompletionDate || "—"}`} />
-                                            {r.fileUrl ? (
-                                                <Button size="small" variant="outlined" onClick={() => window.open(`${API_BASE}${r.fileUrl}`, "_blank")}>
-                                                    Open file
-                                                </Button>
-                                            ) : (
-                                                <Chip size="small" variant="outlined" label="No file" />
-                                            )}
-                                        </Stack>
-                                    </Paper>
-                                ))}
-                            </Stack>
+
+                            {item.requirements.length === 0 ? (
+                                <Typography variant="body2" sx={{ opacity: 0.75 }}>
+                                    No requirements
+                                </Typography>
+                            ) : (
+                                <Stack spacing={1.2}>
+                                    {item.requirements.map(r => (
+                                        <Paper key={r.requirementId} variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
+                                            <Typography sx={{ fontWeight: 800 }}>
+                                                Requirement #{r.requirementId}
+                                            </Typography>
+                                            <Typography sx={{ whiteSpace: "pre-wrap", mt: 0.5 }}>
+                                                {r.description || "—"}
+                                            </Typography>
+                                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mt: 1 }}>
+                                                <Chip
+                                                    size="small"
+                                                    variant="outlined"
+                                                    label={`Wanted date: ${r.forseenCompletionDate || "—"}`}
+                                                />
+                                                {r.fileUrl ? (
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
+                                                        onClick={() => window.open(`${API_BASE}${r.fileUrl}`, "_blank")}
+                                                    >
+                                                        Open file
+                                                    </Button>
+                                                ) : (
+                                                    <Chip size="small" variant="outlined" label="No file" />
+                                                )}
+                                            </Stack>
+                                        </Paper>
+                                    ))}
+                                </Stack>
+                            )}
 
                             <Divider sx={{ my: 2.2 }} />
 
                             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} justifyContent="flex-end">
-                                <Button variant="outlined" onClick={onModify} sx={{ fontWeight: 800 }}>Modify</Button>
-                                <Button variant="contained" color="error" onClick={onDecline} sx={{ fontWeight: 800 }}>Decline</Button>
-                                            <Button
-                                                variant="contained"
-                                                color="success"
-                                                onClick={onAccept}
-                                                disabled={!canAccept}
-                                                sx={{ fontWeight: 800 }}
-                                            >
-                                                Accept
-                                            </Button>
+                                <Button variant="outlined" onClick={onModify} sx={{ fontWeight: 800 }}>
+                                    Modify
+                                </Button>
+                                <Button variant="contained" color="error" onClick={onDecline} sx={{ fontWeight: 800 }}>
+                                    Decline
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="success"
+                                    onClick={onAccept}
+                                    disabled={!canAccept}
+                                    sx={{ fontWeight: 800 }}
+                                >
+                                    Accept
+                                </Button>
                             </Stack>
                         </>
                     ) : (
                         <>
                             <Typography sx={{ fontWeight: 900, mb: 1 }}>Edit Inquiry</Typography>
+
                             <Grid container spacing={2}>
                                 <Grid item xs={12} md={4}>
                                     <TextField
@@ -327,10 +451,18 @@ export default function SentInquiryDetails() {
                                             <Grid item xs={12} md={3}>
                                                 <Button variant="outlined" component="label" fullWidth sx={{ height: "56px" }}>
                                                     {r.file ? "File chosen" : "Replace file"}
-                                                    <input hidden type="file" onChange={(e) => setReqField(idx, "file", e.target.files?.[0] ?? null)} />
+                                                    <input
+                                                        hidden
+                                                        type="file"
+                                                        onChange={(e) => setReqField(idx, "file", e.target.files?.[0] ?? null)}
+                                                    />
                                                 </Button>
                                                 <Typography variant="caption" sx={{ display: "block", mt: 0.5, opacity: 0.75 }}>
-                                                    {r.file?.name ? r.file.name : r.existingFileUrl ? "Current file attached" : "No file"}
+                                                    {r.file?.name
+                                                        ? r.file.name
+                                                        : r.existingFileUrl
+                                                            ? "Current file attached"
+                                                            : "No file"}
                                                 </Typography>
                                             </Grid>
                                         </Grid>
@@ -341,7 +473,9 @@ export default function SentInquiryDetails() {
                             <Divider sx={{ my: 2.2 }} />
 
                             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} justifyContent="flex-end">
-                                <Button variant="outlined" onClick={onCancel} disabled={saving} sx={{ fontWeight: 800 }}>Cancel</Button>
+                                <Button variant="outlined" onClick={onCancel} disabled={saving} sx={{ fontWeight: 800 }}>
+                                    Cancel
+                                </Button>
                                 <Button variant="contained" onClick={onSave} disabled={!canSave || saving} sx={{ fontWeight: 900 }}>
                                     {saving ? "Saving..." : "Save changes"}
                                 </Button>

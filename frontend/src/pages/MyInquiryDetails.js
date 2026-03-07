@@ -17,7 +17,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiDelete, apiPutFormData, apiPostNoBody } from "../api/api";
+import { apiGet, apiDelete, apiPutFormData, apiPostNoBody, apiPost } from "../api/api";
 
 const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";
 
@@ -35,6 +35,40 @@ function money(v) {
     return `€${n.toFixed(2)}`;
 }
 
+function getInquiryStatusMeta(status, isConfirmed) {
+    const s = String(status ?? "").toUpperCase();
+
+    if (s === "ACCEPTED" || isConfirmed) {
+        return { label: "Accepted", color: "success", variant: "filled" };
+    }
+
+    if (s === "PENDING") {
+        return { label: "Pending", color: "default", variant: "outlined" };
+    }
+
+    if (s === "FUNDED") {
+        return { label: "Funded", color: "primary", variant: "filled" };
+    }
+
+    if (s === "IN_PROGRESS") {
+        return { label: "In Progress", color: "warning", variant: "filled" };
+    }
+
+    if (s === "COMPLETED") {
+        return { label: "Completed", color: "success", variant: "filled" };
+    }
+
+    if (s === "CANCELLED") {
+        return { label: "Cancelled", color: "error", variant: "outlined" };
+    }
+
+    return {
+        label: isConfirmed ? "Accepted" : "Pending",
+        color: isConfirmed ? "success" : "default",
+        variant: isConfirmed ? "filled" : "outlined",
+    };
+}
+
 function normalizeInquiry(raw) {
     const x = raw?.item ?? raw?.data ?? raw ?? {};
     const reqs = x.requirements ?? x.Requirements ?? [];
@@ -49,11 +83,10 @@ function normalizeInquiry(raw) {
         creationDate: x.creationDate ?? x.CreationDate ?? null,
 
         isConfirmed: x.isConfirmed ?? x.IsConfirmed ?? false,
+        status: x.status ?? x.Status ?? "PENDING",
 
-        // ✅ ŠITO TRŪKSTA – be šito canAccept neveiks
         lastModifiedBy: x.lastModifiedBy ?? x.LastModifiedBy ?? null,
 
-        // (jei naudoji seen logiką)
         ownerSeen: x.ownerSeen ?? x.OwnerSeen ?? true,
         senderSeen: x.senderSeen ?? x.SenderSeen ?? true,
 
@@ -77,7 +110,7 @@ function newDraftReq() {
 }
 
 export default function MyInquiryDetails() {
-    const { id } = useParams(); // inquiryId
+    const { id } = useParams();
     const navigate = useNavigate();
     const token = useMemo(() => localStorage.getItem("token"), []);
 
@@ -85,14 +118,16 @@ export default function MyInquiryDetails() {
     const [err, setErr] = useState("");
     const [item, setItem] = useState(null);
 
-    const canAccept = item?.lastModifiedBy !== "OWNER" && !item?.isConfirmed;
-
-    // edit mode
     const [isEditing, setIsEditing] = useState(false);
     const [draftPrice, setDraftPrice] = useState("");
     const [draftDesc, setDraftDesc] = useState("");
     const [draftReqs, setDraftReqs] = useState([]);
     const [saving, setSaving] = useState(false);
+
+    const statusMeta = getInquiryStatusMeta(item?.status, item?.isConfirmed);
+
+    // Owner gali accept tik jei paskutinis modifikavo ne OWNER ir dar nėra confirmed
+    const canAccept = item?.lastModifiedBy !== "OWNER" && !item?.isConfirmed;
 
     const load = async (aliveRef = { alive: true }) => {
         try {
@@ -105,7 +140,6 @@ export default function MyInquiryDetails() {
             const n = normalizeInquiry(data);
             setItem(n);
 
-            // preload drafts
             setDraftPrice(n.proposedSum ?? "");
             setDraftDesc(n.description ?? "");
             setDraftReqs(
@@ -141,8 +175,22 @@ export default function MyInquiryDetails() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, navigate, token]);
 
-    const onAccept = () => {
-        alert("Accept (TODO: wire backend)");
+    const onAccept = async () => {
+        try {
+            await apiPostNoBody(`/api/inquiries/${id}/accept-owner`);
+
+            let contract;
+            try {
+                contract = await apiGet(`/api/contracts/by-inquiry/${id}`);
+            } catch {
+                contract = await apiPost(`/api/contracts/from-inquiry/${id}`);
+            }
+
+            alert("Accepted.");
+            navigate(`/contracts/${contract.contractId}`);
+        } catch (e) {
+            alert(e?.message ?? "Accept failed");
+        }
     };
 
     const onDecline = async () => {
@@ -164,7 +212,6 @@ export default function MyInquiryDetails() {
     };
 
     const onCancelEdit = () => {
-        // restore drafts from current item
         if (item) {
             setDraftPrice(item.proposedSum ?? "");
             setDraftDesc(item.description ?? "");
@@ -202,7 +249,6 @@ export default function MyInquiryDetails() {
 
             const fd = new FormData();
 
-            // If ProposedSum is empty, don't append it (keeps null on backend)
             if (draftPrice !== "" && draftPrice != null) {
                 fd.append("ProposedSum", String(draftPrice));
             }
@@ -218,7 +264,6 @@ export default function MyInquiryDetails() {
                 fd.append(`Requirements[${i}].Description`, r.description ?? "");
 
                 if (r.forseenCompletionDate) {
-                    // should be YYYY-MM-DD (from input type="date")
                     fd.append(`Requirements[${i}].ForseenCompletionDate`, r.forseenCompletionDate);
                 }
 
@@ -231,7 +276,6 @@ export default function MyInquiryDetails() {
 
             await apiPutFormData(`/api/inquiries/${id}`, fd);
 
-            // reload fresh details
             const data = await apiGet(`/api/inquiries/${id}`);
             const n = normalizeInquiry(data);
             setItem(n);
@@ -240,7 +284,6 @@ export default function MyInquiryDetails() {
                 await apiPostNoBody(`/api/inquiries/${id}/seen-owner`);
             }
 
-            // refresh drafts too
             setDraftPrice(n.proposedSum ?? "");
             setDraftDesc(n.description ?? "");
             setDraftReqs(
@@ -294,7 +337,6 @@ export default function MyInquiryDetails() {
                 </Paper>
             ) : (
                 <Paper sx={{ p: 2.5, borderRadius: 3 }}>
-                    {/* Header */}
                     <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                         <Box>
                             <Typography variant="h6" sx={{ fontWeight: 900 }}>
@@ -307,11 +349,11 @@ export default function MyInquiryDetails() {
 
                         <Stack direction="row" spacing={1} alignItems="center">
                             <Chip label={`Offer: ${money(item.proposedSum)}`} variant="outlined" />
-                            {item.isConfirmed ? (
-                                <Chip label="Accepted" color="success" />
-                            ) : (
-                                <Chip label="Pending" variant="outlined" />
-                            )}
+                            <Chip
+                                label={statusMeta.label}
+                                color={statusMeta.color}
+                                variant={statusMeta.variant}
+                            />
                         </Stack>
                     </Stack>
 
@@ -319,7 +361,6 @@ export default function MyInquiryDetails() {
 
                     {!isEditing ? (
                         <>
-                            {/* View mode */}
                             <Typography sx={{ fontWeight: 900, mb: 0.5 }}>Description</Typography>
                             <Typography sx={{ whiteSpace: "pre-wrap", opacity: 0.92 }}>
                                 {item.description || "—"}
@@ -379,20 +420,19 @@ export default function MyInquiryDetails() {
                                 <Button variant="contained" color="error" onClick={onDecline} sx={{ fontWeight: 800 }}>
                                     Decline
                                 </Button>
-                                            <Button
-                                                variant="contained"
-                                                color="success"
-                                                onClick={onAccept}
-                                                disabled={!canAccept}
-                                                sx={{ fontWeight: 800 }}
-                                            >
-                                                Accept
-                                            </Button>
+                                <Button
+                                    variant="contained"
+                                    color="success"
+                                    onClick={onAccept}
+                                    disabled={!canAccept}
+                                    sx={{ fontWeight: 800 }}
+                                >
+                                    Accept
+                                </Button>
                             </Stack>
                         </>
                     ) : (
                         <>
-                            {/* Edit mode */}
                             <Typography sx={{ fontWeight: 900, mb: 1 }}>Edit Inquiry</Typography>
 
                             <Grid container spacing={2}>

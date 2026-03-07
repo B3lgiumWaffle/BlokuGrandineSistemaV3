@@ -23,6 +23,14 @@ public partial class b_user
 
     public virtual b_role Role { get; set; } = null!;
 
+    public virtual ICollection<b_completed_listing_fragment> b_completed_listing_fragmentapprovedByUsers { get; set; } = new List<b_completed_listing_fragment>();
+
+    public virtual ICollection<b_completed_listing_fragment> b_completed_listing_fragmentsubmittedByUsers { get; set; } = new List<b_completed_listing_fragment>();
+
+    public virtual ICollection<b_contract> b_contractfkClientUsers { get; set; } = new List<b_contract>();
+
+    public virtual ICollection<b_contract> b_contractfkProviderUsers { get; set; } = new List<b_contract>();
+
     public virtual ICollection<b_inquiry> b_inquiries { get; set; } = new List<b_inquiry>();
 
     public virtual ICollection<b_listing> b_listings { get; set; } = new List<b_listing>();

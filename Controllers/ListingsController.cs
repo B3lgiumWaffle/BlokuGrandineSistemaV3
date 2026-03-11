@@ -56,7 +56,10 @@ public class ListingsController : ControllerBase
             PriceFrom = req.PriceFrom,
             PriceTo = req.PriceTo,
             CompletionTime = req.CompletionTime,
-            // UploadTime gali palikti DB default'u, bet jei nori C# pusėje:
+            isActivated = 0,
+            adminComment = null,
+            reviewedAt = null,
+            fkReviewedByUserId = null,
             UploadTime = DateTime.UtcNow
         };
 
@@ -140,16 +143,14 @@ public class ListingsController : ControllerBase
         return Ok(result);
     }
 
-    // GET /api/listings
-    // (Jei nori kad matytų visi – nuimk [Authorize]. Jei nori tik prisijungę – palik [Authorize].)
     [HttpGet]
     public async Task<IActionResult> GetAllListings()
     {
         var baseUrl = $"{Request.Scheme}://{Request.Host}";
 
-        // Paimam visus listingus ir prie kiekvieno - primary + iki 3 kitų
         var listings = await _db.b_listings
             .AsNoTracking()
+            .Where(l => l.isActivated == 1)
             .OrderByDescending(l => l.UploadTime)
             .Select(l => new
             {
@@ -164,14 +165,13 @@ public class ListingsController : ControllerBase
 
                 photos = _db.b_listing_photos
                     .Where(p => p.listingId == l.listingId)
-                    .OrderByDescending(p => p.IsPrimary)   // primary pirma
+                    .OrderByDescending(p => p.IsPrimary)
                     .ThenByDescending(p => p.UploadTime)
                     .Select(p => p.PhotoUrl)
                     .ToList()
             })
             .ToListAsync();
 
-        // Normalizuojam į frontend-ui patogų formatą:
         var result = listings.Select(l =>
         {
             var urls = (l.photos ?? new List<string>())
@@ -179,8 +179,8 @@ public class ListingsController : ControllerBase
                 .Select(u => u.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? u : $"{baseUrl}{u}")
                 .ToList();
 
-            var primary = urls.FirstOrDefault();               // pirma = primary
-            var thumbs = urls.Skip(1).Take(3).ToList();        // iki 3 mažų
+            var primary = urls.FirstOrDefault();
+            var thumbs = urls.Skip(1).Take(3).ToList();
 
             return new
             {
@@ -192,7 +192,6 @@ public class ListingsController : ControllerBase
                 l.completionTime,
                 l.uploadTime,
                 l.categoryId,
-
                 primaryPhotoUrl = primary,
                 thumbPhotoUrls = thumbs
             };

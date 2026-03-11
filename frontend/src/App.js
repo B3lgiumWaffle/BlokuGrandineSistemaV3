@@ -24,6 +24,13 @@ import MySentInquiries from "./pages/MySentInquiries";
 import MySentInquiriesDetails from "./pages/SentInquiryDetails";
 
 import ContractDetails from "./pages/ContractDetails";
+import MyContracts from "./pages/MyContracts";
+
+import AdminRoute from "./components/AdminRoute";
+import ListingMonitoring from "./pages/ListingMonitoring";
+import ListingMonitoringDetails from "./pages/ListingMonitoringDetails";
+import UserProfileMonitoring from "./pages/UserProfileMonitoring";
+import UserProfileMonitoringDetails from "./pages/UserProfileMonitoringDetails";
 
 import { useEffect, useState } from "react";
 
@@ -70,7 +77,44 @@ export default function App() {
                 <Route path="/my-mysentinquiries" element={<MySentInquiries />} />
                 <Route path="/my-mysentinquiriesdetails/:id" element={<MySentInquiriesDetails />} />
 
+
+                <Route path="/my-contracts" element={<MyContracts />} />
                 <Route path="/contracts/:contractId" element={<ContractDetails />} />
+
+
+                {/* Admin */}
+                <Route
+                    path="/admin/listings"
+                    element={
+                        <AdminRoute>
+                            <ListingMonitoring />
+                        </AdminRoute>
+                    }
+                />
+                <Route
+                    path="/admin/listings/:listingId"
+                    element={
+                        <AdminRoute>
+                            <ListingMonitoringDetails />
+                        </AdminRoute>
+                    }
+                />
+                <Route
+                    path="/admin/users"
+                    element={
+                        <AdminRoute>
+                            <UserProfileMonitoring />
+                        </AdminRoute>
+                    }
+                />
+                <Route
+                    path="/admin/users/:userId"
+                    element={
+                        <AdminRoute>
+                            <UserProfileMonitoringDetails />
+                        </AdminRoute>
+                    }
+                />
             </Routes>
         </>
     );

@@ -21,7 +21,6 @@
   <ItemGroup>
     <Folder Include="Data\" />
     <Folder Include="frontend\src\services\" />
-    <Folder Include="Models\" />
   </ItemGroup>
 
 </Project>

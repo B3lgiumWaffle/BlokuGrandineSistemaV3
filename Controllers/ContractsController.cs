@@ -413,4 +413,51 @@ public class ContractsController : ControllerBase
 
         return int.TryParse(s, out var id) ? id : null;
     }
+
+    [Authorize]
+    [HttpGet("my")]
+    public async Task<ActionResult<IEnumerable<ContractDetailsViewDTO>>> GetMyContracts(CancellationToken ct)
+    {
+        var userId = GetUserIdFromJwt();
+        if (userId == null) return Unauthorized();
+
+        var contracts = await (
+            from c in _db.b_contracts.AsNoTracking()
+            join i in _db.b_inquiries.AsNoTracking() on c.fkInquiryId equals i.inquiryId
+            join l in _db.b_listings.AsNoTracking() on i.fk_listingId equals l.listingId
+            join client in _db.b_users.AsNoTracking() on c.fkClientUserId equals client.UserId
+            join provider in _db.b_users.AsNoTracking() on c.fkProviderUserId equals provider.UserId
+            where c.fkClientUserId == userId.Value || c.fkProviderUserId == userId.Value
+            orderby c.createdAt descending
+            select new ContractDetailsViewDTO
+            {
+                ContractId = c.contractId,
+                InquiryId = c.fkInquiryId,
+                ClientUserId = c.fkClientUserId,
+                ProviderUserId = c.fkProviderUserId,
+                ClientWalletAddress = c.clientWalletAddress,
+                ProviderWalletAddress = c.providerWalletAddress,
+                Network = c.network,
+                SmartContractAddress = c.smartContractAddress,
+                ChainProjectId = c.chainProjectId,
+                AgreedAmountEur = c.agreedAmountEur,
+                FundedAmountEth = c.fundedAmountEth,
+                MilestoneCount = c.milestoneCount,
+                MilestoneAmountEth = c.milestoneAmountEth,
+                FundingTxHash = c.fundingTxHash,
+                Status = c.status,
+                ListingTitle = l.Title ?? "Untitled listing",
+                OtherPartyName = c.fkClientUserId == userId.Value
+                    ? (!string.IsNullOrWhiteSpace(provider.Username)
+                        ? provider.Username
+                        : ((provider.firstname ?? "") + " " + (provider.lastname ?? "")).Trim())
+                    : (!string.IsNullOrWhiteSpace(client.Username)
+                        ? client.Username
+                        : ((client.firstname ?? "") + " " + (client.lastname ?? "")).Trim()),
+                MyRole = c.fkClientUserId == userId.Value ? "Client" : "Provider"
+            }
+        ).ToListAsync(ct);
+
+        return Ok(contracts);
+    }
 }

@@ -48,6 +48,7 @@ public class BrowseListingsController : ControllerBase
                 uploadTime = l.UploadTime,
                 categoryId = l.CategoryId,
                 ownerUserId = l.userId,
+                isActivated = l.isActivated,
 
                 photoUrls = _db.b_listing_photos
                     .Where(p => p.listingId == l.listingId)
@@ -76,6 +77,7 @@ public class BrowseListingsController : ControllerBase
                 l.uploadTime,
                 l.categoryId,
                 l.ownerUserId,
+                l.isActivated,
 
                 primaryPhotoUrl = urls.FirstOrDefault(),
                 thumbPhotoUrls = urls.Skip(1).Take(3).ToList()
@@ -85,8 +87,6 @@ public class BrowseListingsController : ControllerBase
         return Ok(result);
     }
 
-    // GET /api/browselistings/{id}
-    // atidaro konkretų listingą (bet kieno), jei prisijungęs
     [HttpGet("{id:int}")]
     [Authorize]
     public async Task<IActionResult> GetById(int id)
@@ -95,7 +95,7 @@ public class BrowseListingsController : ControllerBase
 
         var listing = await _db.b_listings
             .AsNoTracking()
-            .Where(l => l.listingId == id)
+            .Where(l => l.listingId == id && l.isActivated == 1)
             .Select(l => new
             {
                 listingId = l.listingId,
@@ -106,7 +106,8 @@ public class BrowseListingsController : ControllerBase
                 priceTo = l.PriceTo,
                 completionTime = l.CompletionTime,
                 uploadTime = l.UploadTime,
-                ownerUserId = l.userId
+                ownerUserId = l.userId,
+                isActivated = l.isActivated
             })
             .FirstOrDefaultAsync();
 
@@ -114,8 +115,6 @@ public class BrowseListingsController : ControllerBase
         return Ok(listing);
     }
 
-    // GET /api/browselistings/{listingId}/photos
-    // grąžina visas nuotraukas (primary pirma)
     [HttpGet("{listingId:int}/photos")]
     [Authorize]
     public async Task<IActionResult> GetPhotos(int listingId)
@@ -124,7 +123,7 @@ public class BrowseListingsController : ControllerBase
 
         var listingOk = await _db.b_listings
             .AsNoTracking()
-            .AnyAsync(l => l.listingId == listingId);
+            .AnyAsync(l => l.listingId == listingId && l.isActivated == 1);
 
         if (!listingOk) return NotFound("Listing not found.");
 

@@ -38,4 +38,6 @@ public partial class b_user
     public virtual ICollection<b_inquiry> b_inquiries { get; set; } = new List<b_inquiry>();
 
     public virtual ICollection<b_listing> b_listings { get; set; } = new List<b_listing>();
+
+    public virtual ICollection<b_notification> b_notifications { get; set; } = new List<b_notification>();
 }

@@ -23,6 +23,14 @@ public partial class b_listing
 
     public int CategoryId { get; set; }
 
+    public ulong? isActivated { get; set; }
+
+    public string? adminComment { get; set; }
+
+    public DateTime? reviewedAt { get; set; }
+
+    public int? fkReviewedByUserId { get; set; }
+
     public virtual ICollection<b_inquiry> b_inquiries { get; set; } = new List<b_inquiry>();
 
     public virtual ICollection<b_listing_photo> b_listing_photos { get; set; } = new List<b_listing_photo>();

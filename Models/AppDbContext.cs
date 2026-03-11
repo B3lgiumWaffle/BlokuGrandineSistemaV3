@@ -30,6 +30,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<b_listing_photo> b_listing_photos { get; set; }
 
+    public virtual DbSet<b_notification> b_notifications { get; set; }
+
     public virtual DbSet<b_requirement> b_requirements { get; set; }
 
     public virtual DbSet<b_role> b_roles { get; set; }
@@ -281,6 +283,15 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.UploadTime)
                 .HasDefaultValueSql("current_timestamp()")
                 .HasColumnType("datetime");
+            entity.Property(e => e.adminComment)
+                .HasMaxLength(1000)
+                .UseCollation("utf8_general_ci")
+                .HasCharSet("utf8");
+            entity.Property(e => e.fkReviewedByUserId).HasColumnType("int(11)");
+            entity.Property(e => e.isActivated)
+                .HasDefaultValueSql("b'0'")
+                .HasColumnType("bit(1)");
+            entity.Property(e => e.reviewedAt).HasColumnType("datetime");
             entity.Property(e => e.userId).HasColumnType("int(11)");
 
             entity.HasOne(d => d.user).WithMany(p => p.b_listings)
@@ -308,6 +319,28 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.listing).WithMany(p => p.b_listing_photos)
                 .HasForeignKey(d => d.listingId)
                 .HasConstraintName("fk_photo_listing");
+        });
+
+        modelBuilder.Entity<b_notification>(entity =>
+        {
+            entity.HasKey(e => e.notificationId).HasName("PRIMARY");
+
+            entity.HasIndex(e => e.fkUserId, "FK_b_notifications_b_users");
+
+            entity.Property(e => e.notificationId).HasColumnType("int(11)");
+            entity.Property(e => e.createdAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.fkUserId).HasColumnType("int(11)");
+            entity.Property(e => e.message).HasMaxLength(1000);
+            entity.Property(e => e.referenceId).HasColumnType("int(11)");
+            entity.Property(e => e.title).HasMaxLength(200);
+            entity.Property(e => e.type).HasMaxLength(100);
+
+            entity.HasOne(d => d.fkUser).WithMany(p => p.b_notifications)
+                .HasForeignKey(d => d.fkUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_b_notifications_b_users");
         });
 
         modelBuilder.Entity<b_requirement>(entity =>

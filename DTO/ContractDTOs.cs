@@ -51,3 +51,32 @@ public class ContractDetailsDTO
 }
 
 
+public class ContractDetailsViewDTO
+{
+    public int ContractId { get; set; }
+    public int InquiryId { get; set; }
+    public int ClientUserId { get; set; }
+    public int ProviderUserId { get; set; }
+
+    public string? ClientWalletAddress { get; set; }
+    public string? ProviderWalletAddress { get; set; }
+
+    public string? Network { get; set; }
+    public string? SmartContractAddress { get; set; }
+    public long? ChainProjectId { get; set; }
+
+    public decimal? AgreedAmountEur { get; set; }
+    public decimal? FundedAmountEth { get; set; }
+    public int MilestoneCount { get; set; }
+    public decimal? MilestoneAmountEth { get; set; }
+    public string? FundingTxHash { get; set; }
+    public string? Status { get; set; }
+
+    public DateTime? CreatedAt { get; set; }
+
+    public string ListingTitle { get; set; } = "";
+    public string OtherPartyName { get; set; } = "";
+    public string MyRole { get; set; } = "";
+}
+
+

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Mar 01, 2026 at 10:20 PM
+-- Generation Time: Mar 07, 2026 at 08:21 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -43,6 +43,92 @@ INSERT INTO `b_category` (`CategoryId`, `Title`, `Description`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `b_completed_listing_fragment`
+--
+
+CREATE TABLE `b_completed_listing_fragment` (
+  `fragmentId` int(11) NOT NULL,
+  `fkContractId` int(11) NOT NULL,
+  `fkMilestoneId` int(11) NOT NULL,
+  `fkRequirementId` int(11) DEFAULT NULL,
+  `title` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `filePath` varchar(500) DEFAULT NULL,
+  `submittedByUserId` int(11) NOT NULL,
+  `submittedAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `status` varchar(50) NOT NULL DEFAULT 'Submitted',
+  `reviewComment` text DEFAULT NULL,
+  `approvedByUserId` int(11) DEFAULT NULL,
+  `approvedAt` datetime DEFAULT NULL,
+  `releaseTxHash` varchar(255) DEFAULT NULL,
+  `createdAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `updatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `b_contract`
+--
+
+CREATE TABLE `b_contract` (
+  `contractId` int(11) NOT NULL,
+  `fkInquiryId` int(11) NOT NULL,
+  `fkClientUserId` int(11) NOT NULL,
+  `fkProviderUserId` int(11) NOT NULL,
+  `clientWalletAddress` varchar(255) DEFAULT NULL,
+  `providerWalletAddress` varchar(255) DEFAULT NULL,
+  `network` varchar(50) NOT NULL DEFAULT 'sepolia',
+  `smartContractAddress` varchar(255) DEFAULT NULL,
+  `chainProjectId` bigint(20) DEFAULT NULL,
+  `agreedAmountEur` decimal(18,2) NOT NULL,
+  `fundedAmountEth` decimal(18,8) DEFAULT NULL,
+  `milestoneCount` int(11) NOT NULL,
+  `milestoneAmountEth` decimal(18,8) DEFAULT NULL,
+  `fundingTxHash` varchar(255) DEFAULT NULL,
+  `status` varchar(50) NOT NULL DEFAULT 'PendingFunding',
+  `createdAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `updatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `b_contract`
+--
+
+INSERT INTO `b_contract` (`contractId`, `fkInquiryId`, `fkClientUserId`, `fkProviderUserId`, `clientWalletAddress`, `providerWalletAddress`, `network`, `smartContractAddress`, `chainProjectId`, `agreedAmountEur`, `fundedAmountEth`, `milestoneCount`, `milestoneAmountEth`, `fundingTxHash`, `status`, `createdAt`, `updatedAt`) VALUES
+(3, 8, 2, 1, NULL, NULL, 'sepolia', NULL, NULL, 100.00, NULL, 2, NULL, NULL, 'PendingFunding', '2026-03-07 14:23:28', '2026-03-07 16:23:28');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `b_contract_milestone`
+--
+
+CREATE TABLE `b_contract_milestone` (
+  `milestoneId` int(11) NOT NULL,
+  `fkContractId` int(11) NOT NULL,
+  `fkRequirementId` int(11) DEFAULT NULL,
+  `milestoneNo` int(11) NOT NULL,
+  `amountEth` decimal(18,8) DEFAULT NULL,
+  `amountEurSnapshot` decimal(18,2) NOT NULL,
+  `status` varchar(50) NOT NULL DEFAULT 'Pending',
+  `releaseTxHash` varchar(255) DEFAULT NULL,
+  `releasedAt` datetime DEFAULT NULL,
+  `createdAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `updatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `b_contract_milestone`
+--
+
+INSERT INTO `b_contract_milestone` (`milestoneId`, `fkContractId`, `fkRequirementId`, `milestoneNo`, `amountEth`, `amountEurSnapshot`, `status`, `releaseTxHash`, `releasedAt`, `createdAt`, `updatedAt`) VALUES
+(5, 3, 16, 1, NULL, 50.00, 'Pending', NULL, NULL, '2026-03-07 14:23:28', '2026-03-07 16:23:28'),
+(6, 3, 17, 2, NULL, 50.00, 'Pending', NULL, NULL, '2026-03-07 14:23:28', '2026-03-07 16:23:28');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `b_inquiry`
 --
 
@@ -68,7 +154,7 @@ CREATE TABLE `b_inquiry` (
 --
 
 INSERT INTO `b_inquiry` (`inquiryId`, `fk_listingId`, `fk_userId`, `description`, `proposedSum`, `creationDate`, `isConfirmed`, `status`, `isModified`, `modifiedAt`, `modifiedNote`, `lastModifiedBy`, `ownerSeen`, `senderSeen`) VALUES
-(5, 3, 2, 'Duok sita KO TU NORI', 150.00, '2026-03-01 18:55:26', 0, 'PENDING', 0, '2026-03-01 21:19:28', NULL, 'SENDER', 0, 1);
+(8, 4, 2, 'TESTAS', 100.00, '2026-03-07 14:23:12', 1, 'ACCEPTED', 0, '2026-03-07 14:23:28', NULL, 'SENDER', 0, 1);
 
 -- --------------------------------------------------------
 
@@ -139,10 +225,8 @@ CREATE TABLE `b_requirement` (
 --
 
 INSERT INTO `b_requirement` (`requirementId`, `fk_inquiryId`, `description`, `fileUrl`, `forseenCompletionDate`) VALUES
-(8, 5, 'Req 1', NULL, '2026-03-05'),
-(9, 5, 'Req 2', '/uploads/requirements/e719b86938d441599a077cd43fdd6986.txt', '2026-03-25'),
-(10, 5, 'No nenori', NULL, NULL),
-(11, 5, 'DAsfasdfasfasdfasd', NULL, '2026-07-02');
+(16, 8, 'ATASD', '/uploads/requirements/3d2408c158bb475685e81a3724756bd8.txt', '2026-03-05'),
+(17, 8, 'ADASDASD', NULL, '2026-03-25');
 
 -- --------------------------------------------------------
 
@@ -198,6 +282,38 @@ INSERT INTO `b_user` (`UserId`, `Username`, `Email`, `PasswordHash`, `RoleId`, `
 --
 ALTER TABLE `b_category`
   ADD PRIMARY KEY (`CategoryId`);
+
+--
+-- Indexes for table `b_completed_listing_fragment`
+--
+ALTER TABLE `b_completed_listing_fragment`
+  ADD PRIMARY KEY (`fragmentId`),
+  ADD KEY `fk_fragment_submitted_by` (`submittedByUserId`),
+  ADD KEY `fk_fragment_approved_by` (`approvedByUserId`),
+  ADD KEY `idx_fragment_contract` (`fkContractId`),
+  ADD KEY `idx_fragment_milestone` (`fkMilestoneId`),
+  ADD KEY `idx_fragment_requirement` (`fkRequirementId`),
+  ADD KEY `idx_fragment_status` (`status`);
+
+--
+-- Indexes for table `b_contract`
+--
+ALTER TABLE `b_contract`
+  ADD PRIMARY KEY (`contractId`),
+  ADD KEY `idx_contract_inquiry` (`fkInquiryId`),
+  ADD KEY `idx_contract_client` (`fkClientUserId`),
+  ADD KEY `idx_contract_provider` (`fkProviderUserId`),
+  ADD KEY `idx_contract_status` (`status`);
+
+--
+-- Indexes for table `b_contract_milestone`
+--
+ALTER TABLE `b_contract_milestone`
+  ADD PRIMARY KEY (`milestoneId`),
+  ADD UNIQUE KEY `uq_contract_milestone_no` (`fkContractId`,`milestoneNo`),
+  ADD KEY `idx_milestone_contract` (`fkContractId`),
+  ADD KEY `idx_milestone_requirement` (`fkRequirementId`),
+  ADD KEY `idx_milestone_status` (`status`);
 
 --
 -- Indexes for table `b_inquiry`
@@ -257,10 +373,28 @@ ALTER TABLE `b_category`
   MODIFY `CategoryId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
+-- AUTO_INCREMENT for table `b_completed_listing_fragment`
+--
+ALTER TABLE `b_completed_listing_fragment`
+  MODIFY `fragmentId` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `b_contract`
+--
+ALTER TABLE `b_contract`
+  MODIFY `contractId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `b_contract_milestone`
+--
+ALTER TABLE `b_contract_milestone`
+  MODIFY `milestoneId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
 -- AUTO_INCREMENT for table `b_inquiry`
 --
 ALTER TABLE `b_inquiry`
-  MODIFY `inquiryId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `inquiryId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `b_listing`
@@ -278,7 +412,7 @@ ALTER TABLE `b_listing_photo`
 -- AUTO_INCREMENT for table `b_requirement`
 --
 ALTER TABLE `b_requirement`
-  MODIFY `requirementId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `requirementId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
 -- AUTO_INCREMENT for table `b_role`
@@ -295,6 +429,30 @@ ALTER TABLE `b_user`
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `b_completed_listing_fragment`
+--
+ALTER TABLE `b_completed_listing_fragment`
+  ADD CONSTRAINT `fk_fragment_approved_by` FOREIGN KEY (`approvedByUserId`) REFERENCES `b_user` (`UserId`),
+  ADD CONSTRAINT `fk_fragment_contract` FOREIGN KEY (`fkContractId`) REFERENCES `b_contract` (`contractId`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_fragment_milestone` FOREIGN KEY (`fkMilestoneId`) REFERENCES `b_contract_milestone` (`milestoneId`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_fragment_submitted_by` FOREIGN KEY (`submittedByUserId`) REFERENCES `b_user` (`UserId`);
+
+--
+-- Constraints for table `b_contract`
+--
+ALTER TABLE `b_contract`
+  ADD CONSTRAINT `fk_contract_client` FOREIGN KEY (`fkClientUserId`) REFERENCES `b_user` (`UserId`),
+  ADD CONSTRAINT `fk_contract_inquiry` FOREIGN KEY (`fkInquiryId`) REFERENCES `b_inquiry` (`inquiryId`),
+  ADD CONSTRAINT `fk_contract_provider` FOREIGN KEY (`fkProviderUserId`) REFERENCES `b_user` (`UserId`);
+
+--
+-- Constraints for table `b_contract_milestone`
+--
+ALTER TABLE `b_contract_milestone`
+  ADD CONSTRAINT `fk_milestone_contract` FOREIGN KEY (`fkContractId`) REFERENCES `b_contract` (`contractId`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_milestone_requirement` FOREIGN KEY (`fkRequirementId`) REFERENCES `b_requirement` (`requirementId`);
 
 --
 -- Constraints for table `b_inquiry`

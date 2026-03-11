@@ -12,13 +12,18 @@ public class CreateContractFromInquiryResultDTO
     public List<ContractMilestoneDTO> Milestones { get; set; } = new();
 }
 
+
+
 public class ContractMilestoneDTO
 {
     public int MilestoneId { get; set; }
     public int MilestoneNo { get; set; }
     public int? RequirementId { get; set; }
     public decimal AmountEurSnapshot { get; set; }
+    public decimal? AmountEth { get; set; }
     public string Status { get; set; } = "";
+    public string? ReleaseTxHash { get; set; }
+    public DateTime? ReleasedAt { get; set; }
 }
 
 public class ContractDetailsDTO
@@ -44,3 +49,5 @@ public class ContractDetailsDTO
     public string Status { get; set; } = "";
     public List<ContractMilestoneDTO> Milestones { get; set; } = new();
 }
+
+

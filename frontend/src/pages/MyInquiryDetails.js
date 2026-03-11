@@ -306,6 +306,9 @@ export default function MyInquiryDetails() {
         }
     };
 
+
+
+
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>

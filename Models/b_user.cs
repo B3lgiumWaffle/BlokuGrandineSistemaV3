@@ -21,6 +21,10 @@ public partial class b_user
 
     public string? lastname { get; set; }
 
+    public string? Website { get; set; }
+
+    public string? WalletAddress { get; set; }
+
     public virtual b_role Role { get; set; } = null!;
 
     public virtual ICollection<b_completed_listing_fragment> b_completed_listing_fragmentapprovedByUsers { get; set; } = new List<b_completed_listing_fragment>();

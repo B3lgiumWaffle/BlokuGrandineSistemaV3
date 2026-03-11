@@ -81,9 +81,10 @@ public class ContractsController : ControllerBase
             fkInquiryId = inquiry.inquiryId,
             fkClientUserId = inquiry.fk_userId.Value,
             fkProviderUserId = listing.userId,
-            network = "sepolia",
+            network = "localhost",
             agreedAmountEur = agreedAmountEur,
             milestoneCount = milestoneCount,
+            milestoneAmountEth = milestoneCount > 0 ? Math.Round(agreedAmountEur / milestoneCount, 8) : null,
             status = "PendingFunding",
             createdAt = DateTime.UtcNow,
             updatedAt = DateTime.UtcNow
@@ -114,6 +115,7 @@ public class ContractsController : ControllerBase
                 fkRequirementId = requirements[i].requirementId,
                 milestoneNo = i + 1,
                 amountEurSnapshot = currentAmount,
+                amountEth = currentAmount, // local MVP: 1 EUR = 1 test ETH
                 status = "Pending",
                 createdAt = DateTime.UtcNow,
                 updatedAt = DateTime.UtcNow
@@ -128,7 +130,6 @@ public class ContractsController : ControllerBase
         inquiry.modifiedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);
-
         await tx.CommitAsync(ct);
 
         return Ok(await BuildContractDetails(contract.contractId, ct));
@@ -174,6 +175,173 @@ public class ContractsController : ControllerBase
         return Ok(await BuildContractDetails(contract.contractId, ct));
     }
 
+    [Authorize]
+    [HttpGet("{contractId:int}/blockchain-payload")]
+    public async Task<ActionResult<ContractBlockchainPayloadDTO>> GetBlockchainPayload(int contractId, CancellationToken ct)
+    {
+        var userId = GetUserIdFromJwt();
+        if (userId == null) return Unauthorized();
+
+        var contract = await _db.b_contracts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.contractId == contractId, ct);
+
+        if (contract == null)
+            return NotFound("Contract not found.");
+
+        if (contract.fkClientUserId != userId.Value && contract.fkProviderUserId != userId.Value)
+            return Forbid();
+
+        var milestonesRaw = await _db.b_contract_milestones
+            .Include(m => m.fkRequirement)
+            .AsNoTracking()
+            .Where(m => m.fkContractId == contractId)
+            .OrderBy(m => m.milestoneNo)
+            .ToListAsync(ct);
+
+        var milestones = milestonesRaw.Select(m => new BlockchainMilestonePayloadDTO
+        {
+            MilestoneNo = m.milestoneNo,
+            Title = !string.IsNullOrWhiteSpace(m.fkRequirement?.description)
+                ? m.fkRequirement!.description
+                : $"Milestone {m.milestoneNo}",
+            AmountEth = m.amountEth ?? 0m
+        }).ToList();
+
+        var clientWalletAddress = contract.clientWalletAddress;
+        var providerWalletAddress = contract.providerWalletAddress;
+
+        if (string.IsNullOrWhiteSpace(clientWalletAddress))
+        {
+            clientWalletAddress = await _db.b_users
+                .Where(u => u.UserId == contract.fkClientUserId)
+                .Select(u => u.WalletAddress)
+                .FirstOrDefaultAsync(ct);
+        }
+
+        if (string.IsNullOrWhiteSpace(providerWalletAddress))
+        {
+            providerWalletAddress = await _db.b_users
+                .Where(u => u.UserId == contract.fkProviderUserId)
+                .Select(u => u.WalletAddress)
+                .FirstOrDefaultAsync(ct);
+        }
+
+        return Ok(new ContractBlockchainPayloadDTO
+        {
+            ContractId = contract.contractId,
+            InquiryId = contract.fkInquiryId,
+            ClientWalletAddress = clientWalletAddress,
+            ProviderWalletAddress = providerWalletAddress,
+            Milestones = milestones
+        });
+    }
+
+    [Authorize]
+    [HttpPost("{contractId:int}/on-chain-created")]
+    public async Task<ActionResult<ContractDetailsDTO>> SaveOnChainCreated(
+        int contractId,
+        [FromBody] CreateOnChainProjectDTO dto,
+        CancellationToken ct)
+    {
+        var userId = GetUserIdFromJwt();
+        if (userId == null) return Unauthorized();
+
+        var contract = await _db.b_contracts
+            .FirstOrDefaultAsync(c => c.contractId == contractId, ct);
+
+        if (contract == null)
+            return NotFound("Contract not found.");
+
+        if (contract.fkProviderUserId != userId.Value)
+            return Forbid();
+
+        contract.clientWalletAddress = dto.ClientWalletAddress;
+        contract.providerWalletAddress = dto.ProviderWalletAddress;
+        contract.smartContractAddress = dto.SmartContractAddress;
+        contract.chainProjectId = dto.ChainProjectId;
+        contract.updatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(await BuildContractDetails(contract.contractId, ct));
+    }
+
+    [Authorize]
+    [HttpPost("{contractId:int}/funded")]
+    public async Task<ActionResult<ContractDetailsDTO>> SaveFunded(
+        int contractId,
+        [FromBody] FundContractDTO dto,
+        CancellationToken ct)
+    {
+        var userId = GetUserIdFromJwt();
+        if (userId == null) return Unauthorized();
+
+        var contract = await _db.b_contracts
+            .FirstOrDefaultAsync(c => c.contractId == contractId, ct);
+
+        if (contract == null)
+            return NotFound("Contract not found.");
+
+        if (contract.fkClientUserId != userId.Value)
+            return Forbid();
+
+        contract.clientWalletAddress = dto.ClientWalletAddress;
+        contract.fundedAmountEth = dto.FundedAmountEth;
+        contract.fundingTxHash = dto.FundingTxHash;
+        contract.status = "Funded";
+        contract.updatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(await BuildContractDetails(contract.contractId, ct));
+    }
+
+    [Authorize]
+    [HttpPost("{contractId:int}/milestones/{milestoneNo:int}/released")]
+    public async Task<ActionResult<ContractDetailsDTO>> SaveMilestoneReleased(
+        int contractId,
+        int milestoneNo,
+        [FromBody] ReleaseMilestoneDTO dto,
+        CancellationToken ct)
+    {
+        var userId = GetUserIdFromJwt();
+        if (userId == null) return Unauthorized();
+
+        var contract = await _db.b_contracts
+            .FirstOrDefaultAsync(c => c.contractId == contractId, ct);
+
+        if (contract == null)
+            return NotFound("Contract not found.");
+
+        if (contract.fkClientUserId != userId.Value)
+            return Forbid();
+
+        var milestone = await _db.b_contract_milestones
+            .FirstOrDefaultAsync(m => m.fkContractId == contractId && m.milestoneNo == milestoneNo, ct);
+
+        if (milestone == null)
+            return NotFound("Milestone not found.");
+
+        milestone.amountEth = dto.AmountEth;
+        milestone.releaseTxHash = dto.ReleaseTxHash;
+        milestone.releasedAt = DateTime.UtcNow;
+        milestone.status = "Released";
+        milestone.updatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+
+        var remaining = await _db.b_contract_milestones
+            .CountAsync(m => m.fkContractId == contractId && m.status != "Released", ct);
+
+        contract.status = remaining == 0 ? "Completed" : "InProgress";
+        contract.updatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(await BuildContractDetails(contract.contractId, ct));
+    }
+
     private async Task<ContractDetailsDTO> BuildContractDetails(int contractId, CancellationToken ct)
     {
         var contract = await _db.b_contracts
@@ -186,14 +354,33 @@ public class ContractsController : ControllerBase
             .OrderBy(m => m.milestoneNo)
             .ToListAsync(ct);
 
+        var clientWalletAddress = contract.clientWalletAddress;
+        var providerWalletAddress = contract.providerWalletAddress;
+
+        if (string.IsNullOrWhiteSpace(clientWalletAddress))
+        {
+            clientWalletAddress = await _db.b_users
+                .Where(u => u.UserId == contract.fkClientUserId)
+                .Select(u => u.WalletAddress)
+                .FirstOrDefaultAsync(ct);
+        }
+
+        if (string.IsNullOrWhiteSpace(providerWalletAddress))
+        {
+            providerWalletAddress = await _db.b_users
+                .Where(u => u.UserId == contract.fkProviderUserId)
+                .Select(u => u.WalletAddress)
+                .FirstOrDefaultAsync(ct);
+        }
+
         return new ContractDetailsDTO
         {
             ContractId = contract.contractId,
             InquiryId = contract.fkInquiryId,
             ClientUserId = contract.fkClientUserId,
             ProviderUserId = contract.fkProviderUserId,
-            ClientWalletAddress = contract.clientWalletAddress,
-            ProviderWalletAddress = contract.providerWalletAddress,
+            ClientWalletAddress = clientWalletAddress,
+            ProviderWalletAddress = providerWalletAddress,
             Network = contract.network,
             SmartContractAddress = contract.smartContractAddress,
             ChainProjectId = contract.chainProjectId,
@@ -209,7 +396,10 @@ public class ContractsController : ControllerBase
                 MilestoneNo = m.milestoneNo,
                 RequirementId = m.fkRequirementId,
                 AmountEurSnapshot = m.amountEurSnapshot,
-                Status = m.status
+                AmountEth = m.amountEth,
+                Status = m.status,
+                ReleaseTxHash = m.releaseTxHash,
+                ReleasedAt = m.releasedAt
             }).ToList()
         };
     }

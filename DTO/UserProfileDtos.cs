@@ -12,6 +12,8 @@ namespace BlokuGrandiniuSistema.DTOs
         public string? LastName { get; set; }
 
         public string? AvatarUrl { get; set; }
+        public string? Website { get; set; }
+        public string? WalletAddress { get; set; }
     }
 
     public class UpdateUserProfileDto
@@ -24,6 +26,8 @@ namespace BlokuGrandiniuSistema.DTOs
 
         [MaxLength(50)]
         public string? LastName { get; set; }
+        public string? Website { get; set; }
+        public string? WalletAddress { get; set; }
     }
 
     public class ChangePasswordDto

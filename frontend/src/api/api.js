@@ -1,17 +1,7 @@
 ﻿const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";
-export async function apiPostFormData(path, formData) {
-    const token = localStorage.getItem("token");
 
-    const res = await fetch(`${API_BASE}${path}`, {
-        method: "POST",
-        headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
-            // ❗ ČIA specialiai nededam Content-Type
-        },
-        body: formData
-    });
-
-    const text = await res.text();
+async function parseResponse(res, fallbackMessage) {
+    const text = await res.text().catch(() => "");
     let data = null;
 
     try {
@@ -24,13 +14,13 @@ export async function apiPostFormData(path, formData) {
         throw new Error(
             (data && (data.message || data.title)) ||
             text ||
-            `POST ${path} failed: ${res.status}`
+            fallbackMessage ||
+            `Request failed: ${res.status}`
         );
     }
 
     return data;
 }
-
 
 export async function apiGet(path) {
     const token = localStorage.getItem("token");
@@ -43,11 +33,7 @@ export async function apiGet(path) {
         }
     });
 
-    if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`GET ${path} failed: ${res.status} ${text}`);
-    }
-    return res.json();
+    return parseResponse(res, `GET ${path} failed`);
 }
 
 export async function apiDelete(path) {
@@ -56,43 +42,30 @@ export async function apiDelete(path) {
     const res = await fetch(`${API_BASE}${path}`, {
         method: "DELETE",
         headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
     });
 
-    const txt = await res.text().catch(() => "");
-    if (!res.ok) throw new Error(txt || `DELETE ${path} failed: ${res.status}`);
-}
-
-export async function apiPutFormData(path, formData) {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(`${API_BASE}${path}`, {
-        method: "PUT",
-        headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: formData,
-    });
-
-    const text = await res.text().catch(() => "");
-    if (!res.ok) throw new Error(text || `PUT ${path} failed: ${res.status}`);
+    await parseResponse(res, `DELETE ${path} failed`);
 }
 
 export async function apiPostNoBody(path) {
     const token = localStorage.getItem("token");
+
     const res = await fetch(`${API_BASE}${path}`, {
         method: "POST",
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
     });
-    const txt = await res.text().catch(() => "");
-    if (!res.ok) throw new Error(txt || `POST ${path} failed: ${res.status}`);
+
+    return parseResponse(res, `POST ${path} failed`);
 }
 
-export async function apiPost(url, body = null) {
+export async function apiPost(path, body = null) {
     const token = localStorage.getItem("token");
 
-    const response = await fetch(`https://localhost:7278${url}`, {
+    const res = await fetch(`${API_BASE}${path}`, {
         method: "POST",
         headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -101,34 +74,48 @@ export async function apiPost(url, body = null) {
         body: body ? JSON.stringify(body) : null
     });
 
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || "Request failed");
-    }
-
-    const text = await response.text();
-    return text ? JSON.parse(text) : null;
+    return parseResponse(res, `POST ${path} failed`);
 }
 
+export async function apiPostJson(path, body) {
+    const token = localStorage.getItem("token");
 
-//Atkomentuoti jei nuluz o virsuj istinrit. cia sitas veike su nuotraukom kai buvo pradzia
-//const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";
-//// pakeisk į savo backend base (arba palik jei turi env)
+    const res = await fetch(`${API_BASE}${path}`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(body)
+    });
 
-//export async function apiGet(path) {
-//    const token = localStorage.getItem("token");
+    return parseResponse(res, `POST ${path} failed`);
+}
 
-//    const res = await fetch(`${API_BASE}${path}`, {
-//        method: "GET",
-//        headers: {
-//            "Content-Type": "application/json",
-//            ...(token ? { Authorization: `Bearer ${token}` } : {})
-//        }
-//    });
+export async function apiPutFormData(path, formData) {
+    const token = localStorage.getItem("token");
 
-//    if (!res.ok) {
-//        const text = await res.text().catch(() => "");
-//        throw new Error(`GET ${path} failed: ${res.status} ${text}`);
-//    }
-//    return res.json();
-//}
+    const res = await fetch(`${API_BASE}${path}`, {
+        method: "PUT",
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: formData
+    });
+
+    await parseResponse(res, `PUT ${path} failed`);
+}
+
+export async function apiPostFormData(path, formData) {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(`${API_BASE}${path}`, {
+        method: "POST",
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: formData
+    });
+
+    return parseResponse(res, `POST ${path} failed`);
+}

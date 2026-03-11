@@ -23,6 +23,8 @@ import MyInquiryDetails from "./pages/MyInquiryDetails";
 import MySentInquiries from "./pages/MySentInquiries";
 import MySentInquiriesDetails from "./pages/SentInquiryDetails";
 
+import ContractDetails from "./pages/ContractDetails";
+
 import { useEffect, useState } from "react";
 
 export default function App() {
@@ -67,6 +69,8 @@ export default function App() {
 
                 <Route path="/my-mysentinquiries" element={<MySentInquiries />} />
                 <Route path="/my-mysentinquiriesdetails/:id" element={<MySentInquiriesDetails />} />
+
+                <Route path="/contracts/:contractId" element={<ContractDetails />} />
             </Routes>
         </>
     );

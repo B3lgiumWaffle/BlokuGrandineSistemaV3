@@ -41,7 +41,6 @@ namespace B.Controllers
 
             if (u == null) return NotFound("User not found.");
 
-            // Sukuriam pilną URL avatarui
             string? fullAvatarUrl = null;
 
             if (!string.IsNullOrWhiteSpace(u.avatar))
@@ -57,7 +56,9 @@ namespace B.Controllers
                 Email = u.Email,
                 FirstName = u.firstname,
                 LastName = u.lastname,
-                AvatarUrl = fullAvatarUrl
+                AvatarUrl = fullAvatarUrl,
+                Website = u.Website,
+                WalletAddress = u.WalletAddress
             };
 
             return Ok(dto);
@@ -73,13 +74,36 @@ namespace B.Controllers
             var u = await _db.b_users.FirstOrDefaultAsync(x => x.UserId == userId);
             if (u == null) return NotFound("User not found.");
 
-            // Minimalūs update (paskui pridėsim validacijas ir uniqueness)
-            if (!string.IsNullOrWhiteSpace(dto.Email)) u.Email = dto.Email.Trim();
-            if (dto.FirstName != null) u.firstname = dto.FirstName;
-            if (dto.LastName != null) u.lastname = dto.LastName;
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+                u.Email = dto.Email.Trim();
 
-            // jei šitų laukų DB neturi, paliekam - vėliau pridėsim column
-            // u.Website = dto.Website; ir t.t.
+            if (dto.FirstName != null)
+                u.firstname = dto.FirstName.Trim();
+
+            if (dto.LastName != null)
+                u.lastname = dto.LastName.Trim();
+
+            if (dto.Website != null)
+                u.Website = dto.Website.Trim();
+
+            if (dto.WalletAddress != null)
+            {
+                var wallet = dto.WalletAddress.Trim();
+
+                if (!string.IsNullOrWhiteSpace(wallet))
+                {
+                    var isValidWallet =
+                        System.Text.RegularExpressions.Regex.IsMatch(
+                            wallet,
+                            "^0x[a-fA-F0-9]{40}$"
+                        );
+
+                    if (!isValidWallet)
+                        return BadRequest("Wallet address format is invalid.");
+                }
+
+                u.WalletAddress = wallet;
+            }
 
             await _db.SaveChangesAsync();
             return NoContent();

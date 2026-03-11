@@ -24,33 +24,27 @@ export default function EditProfile() {
     const navigate = useNavigate();
     const token = useMemo(() => localStorage.getItem("token"), []);
 
-    const [active, setActive] = useState("details"); // details | password
+    const [active, setActive] = useState("details");
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState("");
 
-    // Account details
     const [email, setEmail] = useState("");
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
     const [website, setWebsite] = useState("");
-    const [facebook, setFacebook] = useState("");
-    const [twitter, setTwitter] = useState("");
+    const [walletAddress, setWalletAddress] = useState("");
 
-    // Password
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [repeatNewPassword, setRepeatNewPassword] = useState("");
 
-    // Avatar
     const [avatarUrl, setAvatarUrl] = useState("");
     const [avatarFile, setAvatarFile] = useState(null);
 
-    // ---- API URL'ai (pasikeisk jei tavo kitokie) ----
     const API_BASE = "https://localhost:7278";
     const GET_ME = `${API_BASE}/api/users/me`;
     const PUT_ME = `${API_BASE}/api/users/me`;
     const UPLOAD_AVATAR = `${API_BASE}/api/users/me/avatar`;
-    // jei pas tave social fields nėra — gali palikt, backend tiesiog ignoruos (arba ištrink iš payload)
 
     useEffect(() => {
         if (!token) {
@@ -59,6 +53,7 @@ export default function EditProfile() {
         }
 
         let alive = true;
+
         (async () => {
             try {
                 setLoading(true);
@@ -80,9 +75,8 @@ export default function EditProfile() {
                 setFirstName(data?.firstName ?? "");
                 setLastName(data?.lastName ?? "");
                 setWebsite(data?.website ?? "");
-                setFacebook(data?.facebook ?? "");
-                setTwitter(data?.twitter ?? "");
-                setAvatarUrl(data?.avatar ?? data?.avatarUrl ?? "");
+                setWalletAddress(data?.walletAddress ?? "");
+                setAvatarUrl(data?.avatarUrl ?? data?.avatar ?? "");
             } catch (e) {
                 console.error(e);
                 if (alive) setErr("Couldn't load profile data");
@@ -99,14 +93,15 @@ export default function EditProfile() {
     const onPickAvatar = (e) => {
         const file = e.target.files?.[0] ?? null;
         setAvatarFile(file);
-        if (file) setAvatarUrl(URL.createObjectURL(file));
+        if (file) {
+            setAvatarUrl(URL.createObjectURL(file));
+        }
     };
 
     const uploadAvatarIfNeeded = async () => {
         if (!avatarFile) return;
 
         const fd = new FormData();
-        // jei backend laukia kito pavadinimo (pvz. "avatar"), pakeisk čia:
         fd.append("File", avatarFile);
 
         const res = await fetch(UPLOAD_AVATAR, {
@@ -121,23 +116,37 @@ export default function EditProfile() {
         }
     };
 
-
+    const isValidWalletAddress = (value) => {
+        if (!value) return true;
+        return /^0x[a-fA-F0-9]{40}$/.test(value.trim());
+    };
 
     const onSaveDetails = async () => {
-        if (!token) return navigate("/login");
-        if (!email.trim()) return alert("Must provide email");
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+
+        if (!email.trim()) {
+            alert("Must provide email");
+            return;
+        }
+
+        if (!isValidWalletAddress(walletAddress)) {
+            alert("Wallet address format is invalid");
+            return;
+        }
 
         try {
             setLoading(true);
             setErr("");
 
             const payload = {
-                email,
-                firstName,
-                lastName,
-                website,
-                facebook,
-                twitter
+                email: email.trim(),
+                firstName: firstName.trim(),
+                lastName: lastName.trim(),
+                website: website.trim(),
+                walletAddress: walletAddress.trim()
             };
 
             const res = await fetch(PUT_ME, {
@@ -156,7 +165,6 @@ export default function EditProfile() {
             }
 
             await uploadAvatarIfNeeded();
-
             alert("Profile updated");
         } catch (e) {
             console.error(e);
@@ -167,16 +175,21 @@ export default function EditProfile() {
     };
 
     const onSavePassword = async () => {
-        if (!token) return navigate("/login");
+        if (!token) {
+            navigate("/login");
+            return;
+        }
 
         if (!currentPassword || !newPassword || !repeatNewPassword) {
             alert("Please fill all password fields");
             return;
         }
+
         if (newPassword !== repeatNewPassword) {
             alert("New password doesnt match");
             return;
         }
+
         if (newPassword.length < 6) {
             alert("Password is too short (must be atleast 6 symbols)");
             return;
@@ -189,7 +202,6 @@ export default function EditProfile() {
             const payload = { currentPassword, newPassword };
 
             const res = await fetch(`${PUT_ME}/password`, {
-                // jei pas tave password keitimas kitam endpoint’e — pakeisk šitą URL
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -220,7 +232,6 @@ export default function EditProfile() {
         <Container maxWidth="md" sx={{ py: 4 }}>
             <Paper sx={{ p: 3 }}>
                 <Grid container spacing={3}>
-                    {/* LEFT SIDEBAR */}
                     <Grid item xs={12} md={4} lg={3}>
                         <Stack spacing={2} alignItems="center">
                             <Avatar
@@ -264,15 +275,11 @@ export default function EditProfile() {
                                         </ListItemIcon>
                                         <ListItemText primary="Change Password" />
                                     </ListItemButton>
-
-                                    <Divider />
-
                                 </List>
                             </Paper>
                         </Box>
                     </Grid>
 
-                    {/* RIGHT CONTENT */}
                     <Grid item xs={12} md={8} lg={9}>
                         <Typography variant="h4" sx={{ fontWeight: 800, mb: 2 }}>
                             Account Settings
@@ -315,18 +322,13 @@ export default function EditProfile() {
                                     disabled={loading}
                                 />
                                 <TextField
-                                    label="Facebook"
+                                    label="Wallet address"
                                     fullWidth
-                                    value={facebook}
-                                    onChange={(e) => setFacebook(e.target.value)}
+                                    value={walletAddress}
+                                    onChange={(e) => setWalletAddress(e.target.value)}
                                     disabled={loading}
-                                />
-                                <TextField
-                                    label="Twitter"
-                                    fullWidth
-                                    value={twitter}
-                                    onChange={(e) => setTwitter(e.target.value)}
-                                    disabled={loading}
+                                    placeholder="0x..."
+                                    helperText="Enter your Ethereum wallet address"
                                 />
 
                                 <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ pt: 1 }}>

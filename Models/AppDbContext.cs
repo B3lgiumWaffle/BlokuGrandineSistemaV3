@@ -357,6 +357,8 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.PasswordHash).HasMaxLength(255);
             entity.Property(e => e.RoleId).HasColumnType("int(11)");
             entity.Property(e => e.Username).HasMaxLength(50);
+            entity.Property(e => e.WalletAddress).HasColumnType("text");
+            entity.Property(e => e.Website).HasColumnType("text");
             entity.Property(e => e.avatar).HasMaxLength(255);
             entity.Property(e => e.firstname).HasMaxLength(50);
             entity.Property(e => e.lastname).HasMaxLength(50);

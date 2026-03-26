@@ -22,6 +22,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<b_contract> b_contracts { get; set; }
 
+    public virtual DbSet<b_contract_message> b_contract_messages { get; set; }
+
     public virtual DbSet<b_contract_milestone> b_contract_milestones { get; set; }
 
     public virtual DbSet<b_inquiry> b_inquiries { get; set; }
@@ -176,6 +178,39 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey(d => d.fkProviderUserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_contract_provider");
+        });
+
+        modelBuilder.Entity<b_contract_message>(entity =>
+        {
+            entity.HasKey(e => e.messageId).HasName("PRIMARY");
+
+            entity.HasIndex(e => e.fkSenderUserId, "fk_bcm_sender");
+
+            entity.HasIndex(e => new { e.fkContractId, e.sentAt }, "idx_bcm_contract_sentAt");
+
+            entity.HasIndex(e => new { e.fkReceiverUserId, e.isRead }, "idx_bcm_receiver_isRead");
+
+            entity.Property(e => e.messageId).HasColumnType("int(11)");
+            entity.Property(e => e.fkContractId).HasColumnType("int(11)");
+            entity.Property(e => e.fkReceiverUserId).HasColumnType("int(11)");
+            entity.Property(e => e.fkSenderUserId).HasColumnType("int(11)");
+            entity.Property(e => e.messageText).HasColumnType("text");
+            entity.Property(e => e.readAt).HasColumnType("datetime");
+            entity.Property(e => e.sentAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.fkContract).WithMany(p => p.b_contract_messages)
+                .HasForeignKey(d => d.fkContractId)
+                .HasConstraintName("fk_bcm_contract");
+
+            entity.HasOne(d => d.fkReceiverUser).WithMany(p => p.b_contract_messagefkReceiverUsers)
+                .HasForeignKey(d => d.fkReceiverUserId)
+                .HasConstraintName("fk_bcm_receiver");
+
+            entity.HasOne(d => d.fkSenderUser).WithMany(p => p.b_contract_messagefkSenderUsers)
+                .HasForeignKey(d => d.fkSenderUserId)
+                .HasConstraintName("fk_bcm_sender");
         });
 
         modelBuilder.Entity<b_contract_milestone>(entity =>

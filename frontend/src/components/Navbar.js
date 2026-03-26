@@ -132,6 +132,11 @@ export default function Navbar({ user, onLogout }) {
                 return;
             }
 
+            if (n.type === "contract_message") {
+                navigate(`/contracts/${n.referenceId}`);
+                return;
+            }
+
             navigate("/my-profile");
         } catch (e) {
             console.error(e);

@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
     Box,
     Button,
@@ -8,6 +8,7 @@ import {
     Divider,
     Paper,
     Stack,
+    TextField,
     Typography,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
@@ -94,6 +95,33 @@ function normalizePayload(raw) {
     };
 }
 
+function normalizeMessages(raw) {
+    const x = raw?.item ?? raw?.data ?? raw ?? {};
+
+    return {
+        contractId: x.contractId ?? x.ContractId,
+        contractStatus: x.contractStatus ?? x.ContractStatus ?? "",
+        currentUserId: x.currentUserId ?? x.CurrentUserId,
+        otherUserId: x.otherUserId ?? x.OtherUserId,
+        otherUserName: x.otherUserName ?? x.OtherUserName ?? "",
+        canSendMessages: x.canSendMessages ?? x.CanSendMessages ?? false,
+        messages: Array.isArray(x.messages ?? x.Messages)
+            ? (x.messages ?? x.Messages).map((m) => ({
+                messageId: m.messageId ?? m.MessageId,
+                contractId: m.contractId ?? m.ContractId,
+                senderUserId: m.senderUserId ?? m.SenderUserId,
+                receiverUserId: m.receiverUserId ?? m.ReceiverUserId,
+                messageText: m.messageText ?? m.MessageText ?? "",
+                sentAt: m.sentAt ?? m.SentAt,
+                isRead: m.isRead ?? m.IsRead ?? false,
+                readAt: m.readAt ?? m.ReadAt ?? null,
+                senderName: m.senderName ?? m.SenderName ?? "",
+                receiverName: m.receiverName ?? m.ReceiverName ?? ""
+            }))
+            : []
+    };
+}
+
 function getCurrentUserIdFromToken() {
     const token = localStorage.getItem("token");
     if (!token) return null;
@@ -125,10 +153,32 @@ export default function ContractDetails() {
     const [item, setItem] = useState(null);
     const [payload, setPayload] = useState(null);
 
+    const [messagesLoading, setMessagesLoading] = useState(false);
+    const [messagesBusy, setMessagesBusy] = useState(false);
+    const [messagesErr, setMessagesErr] = useState("");
+    const [messagesData, setMessagesData] = useState(null);
+    const [messageText, setMessageText] = useState("");
+
+    const messagesBottomRef = useRef(null);
+
     const currentUserId = getCurrentUserIdFromToken();
 
     const isProvider = item && currentUserId === Number(item.providerUserId);
     const isClient = item && currentUserId === Number(item.clientUserId);
+
+    const loadMessages = async () => {
+        try {
+            setMessagesLoading(true);
+            setMessagesErr("");
+
+            const res = await apiGet(`/api/messages/contract/${contractId}`);
+            setMessagesData(normalizeMessages(res));
+        } catch (e) {
+            setMessagesErr(e?.message ?? "Failed to load messages");
+        } finally {
+            setMessagesLoading(false);
+        }
+    };
 
     const load = async () => {
         try {
@@ -154,9 +204,18 @@ export default function ContractDetails() {
             navigate("/login");
             return;
         }
+
         load();
+        loadMessages();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [contractId, token]);
+
+    useEffect(() => {
+        if (!messagesData) return;
+        setTimeout(() => {
+            messagesBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+    }, [messagesData]);
 
     const totalEth = useMemo(() => {
         const arr = item?.milestones ?? [];
@@ -206,6 +265,7 @@ export default function ContractDetails() {
 
             alert("On-chain project created.");
             await load();
+            await loadMessages();
         } catch (e) {
             console.error(e);
             alert(e?.message ?? "Failed to create on-chain project");
@@ -232,6 +292,7 @@ export default function ContractDetails() {
 
             alert("Contract funded.");
             await load();
+            await loadMessages();
         } catch (e) {
             console.error(e);
             alert(e?.message ?? "Funding failed");
@@ -259,11 +320,33 @@ export default function ContractDetails() {
 
             alert(`Milestone #${m.milestoneNo} released.`);
             await load();
+            await loadMessages();
         } catch (e) {
             console.error(e);
             alert(e?.message ?? "Release failed");
         } finally {
             setBusy(false);
+        }
+    };
+
+    const onSendMessage = async () => {
+        const text = messageText.trim();
+        if (!text) return;
+
+        try {
+            setMessagesBusy(true);
+
+            await apiPostJson(`/api/messages/contract/${contractId}`, {
+                messageText: text
+            });
+
+            setMessageText("");
+            await loadMessages();
+        } catch (e) {
+            console.error(e);
+            alert(e?.message ?? "Failed to send message");
+        } finally {
+            setMessagesBusy(false);
         }
     };
 
@@ -407,6 +490,145 @@ export default function ContractDetails() {
                             );
                         })}
                     </Stack>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <Typography sx={{ fontWeight: 900, mb: 1.2 }}>
+                        Messages
+                    </Typography>
+
+                    {messagesLoading ? (
+                        <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                            <CircularProgress size={28} />
+                        </Box>
+                    ) : messagesErr ? (
+                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
+                            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>Message error</Typography>
+                            <Typography>{messagesErr}</Typography>
+                        </Paper>
+                    ) : (
+                        <Stack spacing={1.5}>
+                            <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                justifyContent="space-between"
+                                alignItems={{ xs: "flex-start", sm: "center" }}
+                                spacing={1}
+                            >
+                                <Typography variant="body2" sx={{ opacity: 0.85 }}>
+                                    Chat with: {messagesData?.otherUserName || "—"}
+                                </Typography>
+
+                                <Chip
+                                    label={messagesData?.canSendMessages ? "Messaging enabled" : "Messaging disabled"}
+                                    color={messagesData?.canSendMessages ? "success" : "default"}
+                                    variant="outlined"
+                                />
+                            </Stack>
+
+                            <Paper
+                                variant="outlined"
+                                sx={{
+                                    p: 1.5,
+                                    borderRadius: 2.5,
+                                    bgcolor: "#fafafa",
+                                    maxHeight: 420,
+                                    overflowY: "auto"
+                                }}
+                            >
+                                <Stack spacing={1.2}>
+                                    {!messagesData?.messages?.length ? (
+                                        <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                            No messages yet.
+                                        </Typography>
+                                    ) : (
+                                        messagesData.messages.map((m) => {
+                                            const isMine =
+                                                Number(m.senderUserId) === Number(messagesData.currentUserId);
+
+                                            return (
+                                                <Box
+                                                    key={m.messageId}
+                                                    sx={{
+                                                        display: "flex",
+                                                        justifyContent: isMine ? "flex-end" : "flex-start"
+                                                    }}
+                                                >
+                                                    <Paper
+                                                        elevation={1}
+                                                        sx={{
+                                                            p: 1.25,
+                                                            borderRadius: 2.5,
+                                                            maxWidth: "75%"
+                                                        }}
+                                                    >
+                                                        <Typography
+                                                            variant="caption"
+                                                            sx={{
+                                                                display: "block",
+                                                                mb: 0.5,
+                                                                opacity: 0.75,
+                                                                fontWeight: 800
+                                                            }}
+                                                        >
+                                                            {isMine ? "You" : (m.senderName || `User #${m.senderUserId}`)}
+                                                        </Typography>
+
+                                                        <Typography
+                                                            variant="body2"
+                                                            sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                                                        >
+                                                            {m.messageText}
+                                                        </Typography>
+
+                                                        <Typography
+                                                            variant="caption"
+                                                            sx={{ display: "block", mt: 0.75, opacity: 0.65 }}
+                                                        >
+                                                            {safeDate(m.sentAt)}
+                                                            {isMine && m.isRead ? ` • Read ${safeDate(m.readAt)}` : ""}
+                                                        </Typography>
+                                                    </Paper>
+                                                </Box>
+                                            );
+                                        })
+                                    )}
+                                    <div ref={messagesBottomRef} />
+                                </Stack>
+                            </Paper>
+
+                            <TextField
+                                label="Write a message"
+                                multiline
+                                minRows={3}
+                                maxRows={6}
+                                fullWidth
+                                value={messageText}
+                                onChange={(e) => setMessageText(e.target.value)}
+                                disabled={!messagesData?.canSendMessages || messagesBusy}
+                            />
+
+                            {!messagesData?.canSendMessages && (
+                                <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                    Messages can only be sent when the contract is Funded or InProgress.
+                                </Typography>
+                            )}
+
+                            <Stack direction="row" justifyContent="flex-end">
+                                <Button
+                                    variant="contained"
+                                    onClick={onSendMessage}
+                                    disabled={
+                                        messagesBusy ||
+                                        !messagesData?.canSendMessages ||
+                                        !messageText.trim()
+                                    }
+                                    sx={{ fontWeight: 800 }}
+                                >
+                                    {messagesBusy ? "Sending..." : "Send message"}
+                                </Button>
+                            </Stack>
+                        </Stack>
+                    )}
                 </Paper>
             )}
         </Container>

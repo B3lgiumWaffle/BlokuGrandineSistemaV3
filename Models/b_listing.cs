@@ -23,7 +23,7 @@ public partial class b_listing
 
     public int CategoryId { get; set; }
 
-    public ulong? isActivated { get; set; }
+    public ulong isActivated { get; set; }
 
     public string? adminComment { get; set; }
 

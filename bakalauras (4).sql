@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Mar 22, 2026 at 11:10 AM
+-- Generation Time: Mar 26, 2026 at 07:43 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -133,7 +133,7 @@ CREATE TABLE `b_contract` (
 INSERT INTO `b_contract` (`contractId`, `fkInquiryId`, `fkClientUserId`, `fkProviderUserId`, `clientWalletAddress`, `providerWalletAddress`, `network`, `smartContractAddress`, `chainProjectId`, `agreedAmountEur`, `fundedAmountEth`, `milestoneCount`, `milestoneAmountEth`, `fundingTxHash`, `status`, `createdAt`, `updatedAt`) VALUES
 (7, 12, 2, 1, '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 'localhost', '0x5FbDB2315678afecb367f032d93F642f64180aa3', 1, 1000.00, 1000.00000000, 3, 333.33333333, '0x3d0688540e44113d6500d81b0dc34f2c7cae968cee1fe6cb5ae2fbceabf55196', 'Completed', '2026-03-08 14:48:57', '2026-03-08 17:02:39'),
 (8, 13, 2, 1, '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 'localhost', '0x5FbDB2315678afecb367f032d93F642f64180aa3', 2, 750.00, 750.00000000, 3, 250.00000000, '0xd11c0cbcc0104c4a43dc3aeadc50e1f06ab807b279f2c73fbd96f22d5879d90e', 'Completed', '2026-03-08 15:04:49', '2026-03-08 17:06:02'),
-(9, 14, 2, 1, NULL, NULL, 'localhost', NULL, NULL, 20.00, NULL, 1, 20.00000000, NULL, 'PendingFunding', '2026-03-08 15:08:53', '2026-03-08 17:08:53'),
+(9, 14, 2, 1, '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 'localhost', '0x5FbDB2315678afecb367f032d93F642f64180aa3', 1, 20.00, 20.00000000, 1, 20.00000000, '0x35346650b99ca274115a45c9bd67ed1f6bd488f4e52cff5cb66c79eedd8aca07', 'Funded', '2026-03-08 15:08:53', '2026-03-26 20:25:40'),
 (10, 16, 2, 1, '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 'localhost', '0x5FbDB2315678afecb367f032d93F642f64180aa3', 1, 400.00, 400.00000000, 2, 200.00000000, '0x42c1765ccf782183090483eebe7970ddeb3bad335d837261bb99280d6a5a62a6', 'Completed', '2026-03-11 13:30:13', '2026-03-11 15:31:11'),
 (11, 17, 2, 1, '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 'localhost', '0x5FbDB2315678afecb367f032d93F642f64180aa3', 1, 5255.00, 5255.00000000, 2, 2627.50000000, '0xd3c347f52439abc45a33355fc7126c153be96a673d3a597fc7d63250afcdea96', 'Completed', '2026-03-13 11:03:27', '2026-03-13 13:04:41');
 
@@ -152,6 +152,34 @@ CREATE TABLE `b_contract_history` (
   `changedAt` datetime NOT NULL DEFAULT current_timestamp(),
   `note` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `b_contract_messages`
+--
+
+CREATE TABLE `b_contract_messages` (
+  `messageId` int(11) NOT NULL,
+  `fkContractId` int(11) NOT NULL,
+  `fkSenderUserId` int(11) NOT NULL,
+  `fkReceiverUserId` int(11) NOT NULL,
+  `messageText` text NOT NULL,
+  `sentAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `isRead` tinyint(1) NOT NULL DEFAULT 0,
+  `readAt` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `b_contract_messages`
+--
+
+INSERT INTO `b_contract_messages` (`messageId`, `fkContractId`, `fkSenderUserId`, `fkReceiverUserId`, `messageText`, `sentAt`, `isRead`, `readAt`) VALUES
+(1, 9, 1, 2, 'Labas vakaras', '2026-03-26 18:26:08', 1, '2026-03-26 18:26:17'),
+(2, 9, 2, 1, 'Ar matei mano žinute?', '2026-03-26 18:26:45', 1, '2026-03-26 18:26:54'),
+(3, 9, 2, 1, 'ĖĖĖ moli', '2026-03-26 18:27:10', 1, '2026-03-26 18:27:20'),
+(4, 9, 2, 1, 'Ė Jokūbai klausyk skolas grąžink', '2026-03-26 18:28:16', 1, '2026-03-26 18:28:20'),
+(5, 9, 2, 1, 'Test notifc', '2026-03-26 18:35:25', 1, '2026-03-26 18:42:24');
 
 -- --------------------------------------------------------
 
@@ -326,7 +354,8 @@ INSERT INTO `b_notifications` (`notificationId`, `fkUserId`, `title`, `message`,
 (3, 1, 'Listing approved', 'Your listing was approved by admin.', 'ListingApproved', 4, 1, '2026-03-11 13:23:15'),
 (4, 1, 'Listing approved', 'Your listing was approved by admin.', 'ListingApproved', 6, 1, '2026-03-11 13:23:58'),
 (5, 1, 'Listing rejected', 'asdadasdad', 'ListingRejected', 7, 1, '2026-03-13 11:10:22'),
-(6, 1, 'Listing approved', 'Your listing was approved by admin.', 'ListingApproved', 7, 0, '2026-03-13 11:10:36');
+(6, 1, 'Listing approved', 'Your listing was approved by admin.', 'ListingApproved', 7, 1, '2026-03-13 11:10:36'),
+(7, 1, 'New message', 'povilas sent you a message: Test notifc', 'contract_message', 9, 1, '2026-03-26 18:35:25');
 
 -- --------------------------------------------------------
 
@@ -485,6 +514,15 @@ ALTER TABLE `b_contract_history`
   ADD KEY `fk_contract_history_user` (`changedByUserId`);
 
 --
+-- Indexes for table `b_contract_messages`
+--
+ALTER TABLE `b_contract_messages`
+  ADD PRIMARY KEY (`messageId`),
+  ADD KEY `fk_bcm_sender` (`fkSenderUserId`),
+  ADD KEY `idx_bcm_contract_sentAt` (`fkContractId`,`sentAt`),
+  ADD KEY `idx_bcm_receiver_isRead` (`fkReceiverUserId`,`isRead`);
+
+--
 -- Indexes for table `b_contract_milestone`
 --
 ALTER TABLE `b_contract_milestone`
@@ -608,6 +646,12 @@ ALTER TABLE `b_contract_history`
   MODIFY `historyId` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `b_contract_messages`
+--
+ALTER TABLE `b_contract_messages`
+  MODIFY `messageId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
 -- AUTO_INCREMENT for table `b_contract_milestone`
 --
 ALTER TABLE `b_contract_milestone`
@@ -641,7 +685,7 @@ ALTER TABLE `b_message`
 -- AUTO_INCREMENT for table `b_notifications`
 --
 ALTER TABLE `b_notifications`
-  MODIFY `notificationId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `notificationId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `b_rating`
@@ -709,6 +753,14 @@ ALTER TABLE `b_contract`
 ALTER TABLE `b_contract_history`
   ADD CONSTRAINT `fk_contract_history_contract` FOREIGN KEY (`fkContractId`) REFERENCES `b_contract` (`contractId`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_contract_history_user` FOREIGN KEY (`changedByUserId`) REFERENCES `b_user` (`UserId`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `b_contract_messages`
+--
+ALTER TABLE `b_contract_messages`
+  ADD CONSTRAINT `fk_bcm_contract` FOREIGN KEY (`fkContractId`) REFERENCES `b_contract` (`contractId`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_bcm_receiver` FOREIGN KEY (`fkReceiverUserId`) REFERENCES `b_user` (`UserId`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_bcm_sender` FOREIGN KEY (`fkSenderUserId`) REFERENCES `b_user` (`UserId`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `b_contract_milestone`

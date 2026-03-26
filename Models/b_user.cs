@@ -31,6 +31,10 @@ public partial class b_user
 
     public virtual ICollection<b_completed_listing_fragment> b_completed_listing_fragmentsubmittedByUsers { get; set; } = new List<b_completed_listing_fragment>();
 
+    public virtual ICollection<b_contract_message> b_contract_messagefkReceiverUsers { get; set; } = new List<b_contract_message>();
+
+    public virtual ICollection<b_contract_message> b_contract_messagefkSenderUsers { get; set; } = new List<b_contract_message>();
+
     public virtual ICollection<b_contract> b_contractfkClientUsers { get; set; } = new List<b_contract>();
 
     public virtual ICollection<b_contract> b_contractfkProviderUsers { get; set; } = new List<b_contract>();

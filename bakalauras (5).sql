@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Mar 26, 2026 at 07:43 PM
+-- Generation Time: Mar 28, 2026 at 11:20 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -179,7 +179,9 @@ INSERT INTO `b_contract_messages` (`messageId`, `fkContractId`, `fkSenderUserId`
 (2, 9, 2, 1, 'Ar matei mano žinute?', '2026-03-26 18:26:45', 1, '2026-03-26 18:26:54'),
 (3, 9, 2, 1, 'ĖĖĖ moli', '2026-03-26 18:27:10', 1, '2026-03-26 18:27:20'),
 (4, 9, 2, 1, 'Ė Jokūbai klausyk skolas grąžink', '2026-03-26 18:28:16', 1, '2026-03-26 18:28:20'),
-(5, 9, 2, 1, 'Test notifc', '2026-03-26 18:35:25', 1, '2026-03-26 18:42:24');
+(5, 9, 2, 1, 'Test notifc', '2026-03-26 18:35:25', 1, '2026-03-26 18:42:24'),
+(6, 9, 2, 1, 'dfsfs', '2026-03-27 11:16:00', 1, '2026-03-27 11:16:05'),
+(7, 9, 1, 2, 'labas', '2026-03-27 11:16:10', 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -355,7 +357,9 @@ INSERT INTO `b_notifications` (`notificationId`, `fkUserId`, `title`, `message`,
 (4, 1, 'Listing approved', 'Your listing was approved by admin.', 'ListingApproved', 6, 1, '2026-03-11 13:23:58'),
 (5, 1, 'Listing rejected', 'asdadasdad', 'ListingRejected', 7, 1, '2026-03-13 11:10:22'),
 (6, 1, 'Listing approved', 'Your listing was approved by admin.', 'ListingApproved', 7, 1, '2026-03-13 11:10:36'),
-(7, 1, 'New message', 'povilas sent you a message: Test notifc', 'contract_message', 9, 1, '2026-03-26 18:35:25');
+(7, 1, 'New message', 'povilas sent you a message: Test notifc', 'contract_message', 9, 1, '2026-03-26 18:35:25'),
+(8, 1, 'New message', 'povilas sent you a message: dfsfs', 'contract_message', 9, 1, '2026-03-27 11:16:00'),
+(9, 2, 'New message', 'jokubas sent you a message: labas', 'contract_message', 9, 0, '2026-03-27 11:16:10');
 
 -- --------------------------------------------------------
 
@@ -649,7 +653,7 @@ ALTER TABLE `b_contract_history`
 -- AUTO_INCREMENT for table `b_contract_messages`
 --
 ALTER TABLE `b_contract_messages`
-  MODIFY `messageId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `messageId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `b_contract_milestone`
@@ -685,7 +689,7 @@ ALTER TABLE `b_message`
 -- AUTO_INCREMENT for table `b_notifications`
 --
 ALTER TABLE `b_notifications`
-  MODIFY `notificationId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `notificationId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `b_rating`

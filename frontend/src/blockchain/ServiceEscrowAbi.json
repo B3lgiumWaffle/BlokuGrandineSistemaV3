@@ -17,11 +17,17 @@
             {
                 "indexed": false,
                 "internalType": "uint256",
-                "name": "amountWei",
+                "name": "providerAmountWei",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "clientRefundAmountWei",
                 "type": "uint256"
             }
         ],
-        "name": "MilestoneReleased",
+        "name": "MilestoneSettled",
         "type": "event"
     },
     {
@@ -137,7 +143,7 @@
                     },
                     {
                         "internalType": "bool",
-                        "name": "released",
+                        "name": "settled",
                         "type": "bool"
                     }
                 ],
@@ -206,6 +212,11 @@
                 "internalType": "bool",
                 "name": "providerAccepted",
                 "type": "bool"
+            },
+            {
+                "internalType": "uint256",
+                "name": "settledCount",
+                "type": "uint256"
             }
         ],
         "stateMutability": "view",
@@ -225,6 +236,34 @@
             }
         ],
         "name": "releaseMilestone",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "projectId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "milestoneIndex",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "providerAmountWei",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "clientRefundAmountWei",
+                "type": "uint256"
+            }
+        ],
+        "name": "settleMilestone",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"

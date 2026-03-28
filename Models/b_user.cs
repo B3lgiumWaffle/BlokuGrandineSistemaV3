@@ -27,9 +27,15 @@ public partial class b_user
 
     public virtual b_role Role { get; set; } = null!;
 
+    public virtual ICollection<b_comment> b_comments { get; set; } = new List<b_comment>();
+
+    public virtual ICollection<b_completed_list_fragment_history> b_completed_list_fragment_histories { get; set; } = new List<b_completed_list_fragment_history>();
+
     public virtual ICollection<b_completed_listing_fragment> b_completed_listing_fragmentapprovedByUsers { get; set; } = new List<b_completed_listing_fragment>();
 
     public virtual ICollection<b_completed_listing_fragment> b_completed_listing_fragmentsubmittedByUsers { get; set; } = new List<b_completed_listing_fragment>();
+
+    public virtual ICollection<b_contract_history> b_contract_histories { get; set; } = new List<b_contract_history>();
 
     public virtual ICollection<b_contract_message> b_contract_messagefkReceiverUsers { get; set; } = new List<b_contract_message>();
 
@@ -44,4 +50,8 @@ public partial class b_user
     public virtual ICollection<b_listing> b_listings { get; set; } = new List<b_listing>();
 
     public virtual ICollection<b_notification> b_notifications { get; set; } = new List<b_notification>();
+
+    public virtual ICollection<b_rating> b_ratingfkFromUsers { get; set; } = new List<b_rating>();
+
+    public virtual ICollection<b_rating> b_ratingfkToUsers { get; set; } = new List<b_rating>();
 }

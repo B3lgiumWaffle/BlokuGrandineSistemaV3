@@ -31,9 +31,13 @@ public partial class b_listing
 
     public int? fkReviewedByUserId { get; set; }
 
+    public virtual ICollection<b_comment> b_comments { get; set; } = new List<b_comment>();
+
     public virtual ICollection<b_inquiry> b_inquiries { get; set; } = new List<b_inquiry>();
 
     public virtual ICollection<b_listing_photo> b_listing_photos { get; set; } = new List<b_listing_photo>();
+
+    public virtual ICollection<b_rating> b_ratings { get; set; } = new List<b_rating>();
 
     public virtual b_user user { get; set; } = null!;
 }

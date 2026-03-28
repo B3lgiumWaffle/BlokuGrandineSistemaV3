@@ -10,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 // ---------- SERVICES (VISKAS PRIEŠ builder.Build()) ----------
 builder.Services.AddControllers();
 builder.Services.AddScoped<IFileStorage, FileStorage>();
+builder.Services.AddScoped<IValuationService, ValuationService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

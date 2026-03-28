@@ -5,7 +5,7 @@ contract ServiceEscrow {
     struct Milestone {
         string title;
         uint256 amountWei;
-        bool released;
+        bool settled;
     }
 
     struct Project {
@@ -16,6 +16,7 @@ contract ServiceEscrow {
         bool funded;
         bool clientSigned;
         bool providerAccepted;
+        uint256 settledCount;
     }
 
     uint256 public nextProjectId;
@@ -34,10 +35,11 @@ contract ServiceEscrow {
         uint256 totalWei
     );
 
-    event MilestoneReleased(
+    event MilestoneSettled(
         uint256 indexed projectId,
         uint256 indexed milestoneIndex,
-        uint256 amountWei
+        uint256 providerAmountWei,
+        uint256 clientRefundAmountWei
     );
 
     function createProject(
@@ -67,7 +69,8 @@ contract ServiceEscrow {
             totalWei: total,
             funded: false,
             clientSigned: false,
-            providerAccepted: true
+            providerAccepted: true,
+            settledCount: 0
         });
 
         for (uint256 i = 0; i < titles.length; i++) {
@@ -75,7 +78,7 @@ contract ServiceEscrow {
                 Milestone({
                     title: titles[i],
                     amountWei: amountsWei[i],
-                    released: false
+                    settled: false
                 })
             );
         }
@@ -102,12 +105,42 @@ contract ServiceEscrow {
         require(p.funded, "Not funded");
 
         Milestone storage m = projectMilestones[projectId][milestoneIndex];
-        require(!m.released, "Already released");
+        require(!m.settled, "Already settled");
 
-        m.released = true;
+        m.settled = true;
+        p.settledCount += 1;
+
         payable(p.provider).transfer(m.amountWei);
 
-        emit MilestoneReleased(projectId, milestoneIndex, m.amountWei);
+        emit MilestoneSettled(projectId, milestoneIndex, m.amountWei, 0);
+    }
+
+    function settleMilestone(
+        uint256 projectId,
+        uint256 milestoneIndex,
+        uint256 providerAmountWei,
+        uint256 clientRefundAmountWei
+    ) external {
+        Project storage p = projects[projectId];
+        require(msg.sender == p.client, "Only client");
+        require(p.funded, "Not funded");
+
+        Milestone storage m = projectMilestones[projectId][milestoneIndex];
+        require(!m.settled, "Already settled");
+        require(providerAmountWei + clientRefundAmountWei == m.amountWei, "Amounts must match milestone");
+
+        m.settled = true;
+        p.settledCount += 1;
+
+        if (providerAmountWei > 0) {
+            payable(p.provider).transfer(providerAmountWei);
+        }
+
+        if (clientRefundAmountWei > 0) {
+            payable(p.client).transfer(clientRefundAmountWei);
+        }
+
+        emit MilestoneSettled(projectId, milestoneIndex, providerAmountWei, clientRefundAmountWei);
     }
 
     function getMilestones(uint256 projectId) external view returns (Milestone[] memory) {

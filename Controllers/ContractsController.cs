@@ -1,22 +1,28 @@
 ﻿using System.Security.Claims;
 using BlokuGrandiniuSistema.DTOs;
 using BlokuGrandiniuSistema.Models;
+using BlokuGrandiniuSistema.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokuGrandiniuSistema.Controllers;
 
+
 [ApiController]
 [Route("api/[controller]")]
 public class ContractsController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly IFileStorage _files;
 
-    public ContractsController(AppDbContext db)
+    public ContractsController(AppDbContext db, IFileStorage files)
     {
         _db = db;
+        _files = files;
     }
+
+
 
     [Authorize]
     [HttpPost("from-inquiry/{inquiryId:int}")]
@@ -340,6 +346,129 @@ public class ContractsController : ControllerBase
         await _db.SaveChangesAsync(ct);
 
         return Ok(await BuildContractDetails(contract.contractId, ct));
+    }
+
+    [Authorize]
+    [HttpPost("{contractId:int}/milestones/{milestoneNo:int}/submit-fragment")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> SubmitFragment(
+    int contractId,
+    int milestoneNo,
+    [FromForm] SubmitContractFragmentDTO dto,
+    CancellationToken ct)
+    {
+        var userId = GetUserIdFromJwt();
+        if (userId == null) return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(dto.Title))
+            return BadRequest("Title is required.");
+
+        var contract = await _db.b_contracts
+            .FirstOrDefaultAsync(c => c.contractId == contractId, ct);
+
+        if (contract == null)
+            return NotFound("Contract not found.");
+
+        if (contract.fkProviderUserId != userId.Value)
+            return Forbid();
+
+        if (contract.status == "Completed" || contract.status == "Closed")
+            return BadRequest("Contract is already finished.");
+
+        var milestone = await _db.b_contract_milestones
+            .FirstOrDefaultAsync(m => m.fkContractId == contractId && m.milestoneNo == milestoneNo, ct);
+
+        if (milestone == null)
+            return NotFound("Milestone not found.");
+
+        if (string.Equals(milestone.status, "Released", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(milestone.status, "ReleasedPartial", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Milestone is already settled.");
+
+        string? fileUrl = null;
+
+        if (dto.File != null && dto.File.Length > 0)
+        {
+            fileUrl = await _files.SaveRequirementFileAsync(dto.File, ct);
+        }
+
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        var oldContractStatus = contract.status;
+        var oldMilestoneStatus = milestone.status;
+
+        var fragment = new b_completed_listing_fragment
+        {
+            fkContractId = contract.contractId,
+            fkMilestoneId = milestone.milestoneId,
+            fkRequirementId = milestone.fkRequirementId,
+            title = dto.Title.Trim(),
+            description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim(),
+            filePath = fileUrl,
+            submittedByUserId = userId.Value,
+            submittedAt = DateTime.UtcNow,
+            status = "Submitted",
+            reviewComment = null,
+            approvedByUserId = null,
+            approvedAt = null,
+            releaseTxHash = null,
+            createdAt = DateTime.UtcNow,
+            updatedAt = DateTime.UtcNow
+        };
+
+        _db.b_completed_listing_fragments.Add(fragment);
+
+        milestone.status = "Submitted";
+        milestone.updatedAt = DateTime.UtcNow;
+
+        contract.status = "WaitingForApproval";
+        contract.updatedAt = DateTime.UtcNow;
+
+        _db.b_contract_histories.Add(new b_contract_history
+        {
+            fkContractId = contract.contractId,
+            oldStatus = oldContractStatus,
+            newStatus = contract.status,
+            changedByUserId = userId.Value,
+            changedAt = DateTime.UtcNow,
+            note = $"Provider submitted fragment for milestone #{milestone.milestoneNo}."
+        });
+
+        _db.b_completed_list_fragment_histories.Add(new b_completed_list_fragment_history
+        {
+            fkContractId = contract.contractId,
+            milestoneIndex = milestone.milestoneNo,
+            oldStatus = oldMilestoneStatus,
+            newStatus = "Submitted",
+            changedByUserId = userId.Value,
+            changedAt = DateTime.UtcNow,
+            note = $"Fragment submitted: {dto.Title.Trim()}",
+            delayInDays = 0,
+            isFinalState = false
+        });
+
+        _db.b_notifications.Add(new b_notification
+        {
+            fkUserId = contract.fkClientUserId,
+            title = "New fragment submitted",
+            message = $"Provider submitted a fragment for contract #{contract.contractId}, milestone #{milestone.milestoneNo}.",
+            type = "contract_fragment_submitted",
+            referenceId = contract.contractId,
+            isRead = false,
+            createdAt = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+
+        return Ok(new
+        {
+            message = "Fragment submitted successfully.",
+            fragmentId = fragment.fragmentId,
+            contractStatus = contract.status,
+            milestoneStatus = milestone.status,
+            filePath = fileUrl
+        });
     }
 
     private async Task<ContractDetailsDTO> BuildContractDetails(int contractId, CancellationToken ct)

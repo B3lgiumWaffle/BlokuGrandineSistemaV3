@@ -39,11 +39,19 @@ public partial class b_contract
 
     public DateTime updatedAt { get; set; }
 
+    public virtual ICollection<b_comment> b_comments { get; set; } = new List<b_comment>();
+
+    public virtual ICollection<b_completed_list_fragment_history> b_completed_list_fragment_histories { get; set; } = new List<b_completed_list_fragment_history>();
+
     public virtual ICollection<b_completed_listing_fragment> b_completed_listing_fragments { get; set; } = new List<b_completed_listing_fragment>();
+
+    public virtual ICollection<b_contract_history> b_contract_histories { get; set; } = new List<b_contract_history>();
 
     public virtual ICollection<b_contract_message> b_contract_messages { get; set; } = new List<b_contract_message>();
 
     public virtual ICollection<b_contract_milestone> b_contract_milestones { get; set; } = new List<b_contract_milestone>();
+
+    public virtual b_rating? b_rating { get; set; }
 
     public virtual b_user fkClientUser { get; set; } = null!;
 

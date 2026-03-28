@@ -18,9 +18,15 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<b_category> b_categories { get; set; }
 
+    public virtual DbSet<b_comment> b_comments { get; set; }
+
+    public virtual DbSet<b_completed_list_fragment_history> b_completed_list_fragment_histories { get; set; }
+
     public virtual DbSet<b_completed_listing_fragment> b_completed_listing_fragments { get; set; }
 
     public virtual DbSet<b_contract> b_contracts { get; set; }
+
+    public virtual DbSet<b_contract_history> b_contract_histories { get; set; }
 
     public virtual DbSet<b_contract_message> b_contract_messages { get; set; }
 
@@ -33,6 +39,8 @@ public partial class AppDbContext : DbContext
     public virtual DbSet<b_listing_photo> b_listing_photos { get; set; }
 
     public virtual DbSet<b_notification> b_notifications { get; set; }
+
+    public virtual DbSet<b_rating> b_ratings { get; set; }
 
     public virtual DbSet<b_requirement> b_requirements { get; set; }
 
@@ -59,6 +67,72 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.CategoryId).HasColumnType("int(11)");
             entity.Property(e => e.Description).HasColumnType("text");
             entity.Property(e => e.Title).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<b_comment>(entity =>
+        {
+            entity.HasKey(e => e.commentId).HasName("PRIMARY");
+
+            entity.HasIndex(e => e.fkContractId, "fk_comments_contract");
+
+            entity.HasIndex(e => e.fkListingId, "fk_comments_listing");
+
+            entity.HasIndex(e => e.fkUserId, "fk_comments_user");
+
+            entity.Property(e => e.commentId).HasColumnType("int(11)");
+            entity.Property(e => e.commentText).HasColumnType("text");
+            entity.Property(e => e.createdAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.fkContractId).HasColumnType("int(11)");
+            entity.Property(e => e.fkListingId).HasColumnType("int(11)");
+            entity.Property(e => e.fkUserId).HasColumnType("int(11)");
+            entity.Property(e => e.isVisible)
+                .IsRequired()
+                .HasDefaultValueSql("'1'");
+
+            entity.HasOne(d => d.fkContract).WithMany(p => p.b_comments)
+                .HasForeignKey(d => d.fkContractId)
+                .HasConstraintName("fk_comments_contract");
+
+            entity.HasOne(d => d.fkListing).WithMany(p => p.b_comments)
+                .HasForeignKey(d => d.fkListingId)
+                .HasConstraintName("fk_comments_listing");
+
+            entity.HasOne(d => d.fkUser).WithMany(p => p.b_comments)
+                .HasForeignKey(d => d.fkUserId)
+                .HasConstraintName("fk_comments_user");
+        });
+
+        modelBuilder.Entity<b_completed_list_fragment_history>(entity =>
+        {
+            entity.HasKey(e => e.historyId).HasName("PRIMARY");
+
+            entity.ToTable("b_completed_list_fragment_history");
+
+            entity.HasIndex(e => e.fkContractId, "fk_fragment_history_contract");
+
+            entity.HasIndex(e => e.changedByUserId, "fk_fragment_history_user");
+
+            entity.Property(e => e.historyId).HasColumnType("int(11)");
+            entity.Property(e => e.changedAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.changedByUserId).HasColumnType("int(11)");
+            entity.Property(e => e.delayInDays).HasColumnType("int(11)");
+            entity.Property(e => e.fkContractId).HasColumnType("int(11)");
+            entity.Property(e => e.milestoneIndex).HasColumnType("int(11)");
+            entity.Property(e => e.newStatus).HasMaxLength(50);
+            entity.Property(e => e.note).HasColumnType("text");
+            entity.Property(e => e.oldStatus).HasMaxLength(50);
+
+            entity.HasOne(d => d.changedByUser).WithMany(p => p.b_completed_list_fragment_histories)
+                .HasForeignKey(d => d.changedByUserId)
+                .HasConstraintName("fk_fragment_history_user");
+
+            entity.HasOne(d => d.fkContract).WithMany(p => p.b_completed_list_fragment_histories)
+                .HasForeignKey(d => d.fkContractId)
+                .HasConstraintName("fk_fragment_history_contract");
         });
 
         modelBuilder.Entity<b_completed_listing_fragment>(entity =>
@@ -178,6 +252,35 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey(d => d.fkProviderUserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_contract_provider");
+        });
+
+        modelBuilder.Entity<b_contract_history>(entity =>
+        {
+            entity.HasKey(e => e.historyId).HasName("PRIMARY");
+
+            entity.ToTable("b_contract_history");
+
+            entity.HasIndex(e => e.fkContractId, "fk_contract_history_contract");
+
+            entity.HasIndex(e => e.changedByUserId, "fk_contract_history_user");
+
+            entity.Property(e => e.historyId).HasColumnType("int(11)");
+            entity.Property(e => e.changedAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.changedByUserId).HasColumnType("int(11)");
+            entity.Property(e => e.fkContractId).HasColumnType("int(11)");
+            entity.Property(e => e.newStatus).HasMaxLength(50);
+            entity.Property(e => e.note).HasColumnType("text");
+            entity.Property(e => e.oldStatus).HasMaxLength(50);
+
+            entity.HasOne(d => d.changedByUser).WithMany(p => p.b_contract_histories)
+                .HasForeignKey(d => d.changedByUserId)
+                .HasConstraintName("fk_contract_history_user");
+
+            entity.HasOne(d => d.fkContract).WithMany(p => p.b_contract_histories)
+                .HasForeignKey(d => d.fkContractId)
+                .HasConstraintName("fk_contract_history_contract");
         });
 
         modelBuilder.Entity<b_contract_message>(entity =>
@@ -376,6 +479,54 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey(d => d.fkUserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_b_notifications_b_users");
+        });
+
+        modelBuilder.Entity<b_rating>(entity =>
+        {
+            entity.HasKey(e => e.ratingId).HasName("PRIMARY");
+
+            entity.ToTable("b_rating");
+
+            entity.HasIndex(e => e.fkFromUserId, "fk_rating_from_user");
+
+            entity.HasIndex(e => e.fkListingId, "fk_rating_listing");
+
+            entity.HasIndex(e => e.fkToUserId, "fk_rating_to_user");
+
+            entity.HasIndex(e => e.fkContractId, "uq_rating_contract").IsUnique();
+
+            entity.Property(e => e.ratingId).HasColumnType("int(11)");
+            entity.Property(e => e.createdAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.fkContractId).HasColumnType("int(11)");
+            entity.Property(e => e.fkFromUserId).HasColumnType("int(11)");
+            entity.Property(e => e.fkListingId).HasColumnType("int(11)");
+            entity.Property(e => e.fkToUserId).HasColumnType("int(11)");
+            entity.Property(e => e.systemRating).HasPrecision(4, 2);
+            entity.Property(e => e.systemRatingReason).HasColumnType("text");
+            entity.Property(e => e.updatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.userRating).HasColumnType("int(11)");
+            entity.Property(e => e.userRatingComment).HasColumnType("text");
+
+            entity.HasOne(d => d.fkContract).WithOne(p => p.b_rating)
+                .HasForeignKey<b_rating>(d => d.fkContractId)
+                .HasConstraintName("fk_rating_contract");
+
+            entity.HasOne(d => d.fkFromUser).WithMany(p => p.b_ratingfkFromUsers)
+                .HasForeignKey(d => d.fkFromUserId)
+                .HasConstraintName("fk_rating_from_user");
+
+            entity.HasOne(d => d.fkListing).WithMany(p => p.b_ratings)
+                .HasForeignKey(d => d.fkListingId)
+                .HasConstraintName("fk_rating_listing");
+
+            entity.HasOne(d => d.fkToUser).WithMany(p => p.b_ratingfkToUsers)
+                .HasForeignKey(d => d.fkToUserId)
+                .HasConstraintName("fk_rating_to_user");
         });
 
         modelBuilder.Entity<b_requirement>(entity =>

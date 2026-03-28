@@ -2,11 +2,41 @@
 import escrowAbi from "./ServiceEscrowAbi.json";
 
 export const ESCROW_ADDRESS =
-    process.env.REACT_APP_ESCROW_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
-
+    process.env.REACT_APP_ESCROW_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
 if (!ESCROW_ADDRESS) {
     throw new Error("Missing REACT_APP_ESCROW_ADDRESS in .env");
+}
+
+async function ensureLocalNetwork() {
+    const chainIdHex = "0x7a69"; // 31337
+
+    try {
+        await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: chainIdHex }],
+        });
+    } catch (switchError) {
+        if (switchError.code === 4902) {
+            await window.ethereum.request({
+                method: "wallet_addEthereumChain",
+                params: [
+                    {
+                        chainId: chainIdHex,
+                        chainName: "Hardhat Local",
+                        nativeCurrency: {
+                            name: "ETH",
+                            symbol: "ETH",
+                            decimals: 18,
+                        },
+                        rpcUrls: ["http://127.0.0.1:8545"],
+                    },
+                ],
+            });
+        } else {
+            throw switchError;
+        }
+    }
 }
 
 async function getProviderAndSigner() {
@@ -16,12 +46,10 @@ async function getProviderAndSigner() {
 
     await window.ethereum.request({ method: "eth_requestAccounts" });
     await ensureLocalNetwork();
+
     const provider = new BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
     const network = await provider.getNetwork();
-
-    console.log("NETWORK:", network);
-    console.log("SIGNER:", await signer.getAddress());
 
     if (Number(network.chainId) !== 31337) {
         throw new Error(
@@ -44,14 +72,7 @@ export async function createOnChainProject({
     milestones
 }) {
     const { provider, signer } = await getProviderAndSigner();
-
     const signerAddress = await signer.getAddress();
-
-    console.log("ESCROW_ADDRESS:", ESCROW_ADDRESS);
-    console.log("SIGNER:", signerAddress);
-    console.log("PROVIDER WALLET ADDRESS PARAM:", providerWalletAddress);
-    console.log("CLIENT WALLET ADDRESS PARAM:", clientWalletAddress);
-    console.log("NETWORK:", await provider.getNetwork());
 
     if (signerAddress.toLowerCase() !== providerWalletAddress.toLowerCase()) {
         throw new Error(
@@ -64,7 +85,6 @@ export async function createOnChainProject({
     const titles = milestones.map((m) => m.title);
     const amountsWei = milestones.map((m) => parseEther(String(m.amountEth)));
 
-    // Pasiimam projectId PRIES transakciją
     const nextProjectId = await contract.nextProjectId();
     const projectId = Number(nextProjectId);
 
@@ -131,33 +151,25 @@ export async function releaseMilestoneOnChain({
     };
 }
 
-async function ensureLocalNetwork() {
-    const chainIdHex = "0x7a69"; // 31337 hex
+export async function settleMilestoneOnChain({
+    projectId,
+    milestoneIndex,
+    providerAmountEth,
+    clientRefundAmountEth
+}) {
+    const { signer } = await getProviderAndSigner();
+    const contract = new Contract(ESCROW_ADDRESS, escrowAbi, signer);
 
-    try {
-        await window.ethereum.request({
-            method: "wallet_switchEthereumChain",
-            params: [{ chainId: chainIdHex }],
-        });
-    } catch (switchError) {
-        if (switchError.code === 4902) {
-            await window.ethereum.request({
-                method: "wallet_addEthereumChain",
-                params: [
-                    {
-                        chainId: chainIdHex,
-                        chainName: "Hardhat Local",
-                        nativeCurrency: {
-                            name: "ETH",
-                            symbol: "ETH",
-                            decimals: 18,
-                        },
-                        rpcUrls: ["http://127.0.0.1:8545"],
-                    },
-                ],
-            });
-        } else {
-            throw switchError;
-        }
-    }
+    const tx = await contract.settleMilestone(
+        projectId,
+        milestoneIndex,
+        parseEther(String(providerAmountEth)),
+        parseEther(String(clientRefundAmountEth))
+    );
+
+    const receipt = await tx.wait();
+
+    return {
+        txHash: receipt.hash
+    };
 }

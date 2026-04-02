@@ -35,6 +35,30 @@ function normalizeListing(raw) {
     };
 }
 
+function normalizeComments(raw) {
+    const data = Array.isArray(raw) ? raw : raw?.items ?? raw?.data ?? [];
+
+    return data.map((x, index) => ({
+        commentId: x.commentId ?? x.CommentId ?? index,
+        commentText: x.commentText ?? x.CommentText ?? "",
+        createdAt: x.createdAt ?? x.CreatedAt ?? null,
+        username:
+            x.username ??
+            x.Username ??
+            x.userName ??
+            x.UserName ??
+            x.fullName ??
+            x.FullName ??
+            "User",
+        avatar:
+            x.avatar ??
+            x.Avatar ??
+            x.avatarUrl ??
+            x.AvatarUrl ??
+            null,
+    }));
+}
+
 function normalizePhotos(rawPhotos) {
     const arr = Array.isArray(rawPhotos) ? rawPhotos : [];
     const mapped = arr
@@ -56,11 +80,17 @@ function moneyRangeText(priceFrom, priceTo) {
     return "Nenurodyta";
 }
 
+function formatDate(value) {
+    if (!value) return "";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString();
+}
+
 function newReq() {
     return { description: "", forseenCompletionDate: "", file: null };
 }
 
-/** Inline modal component (kad būtų "pilnas kodas" viename faile) */
 function InquiryModal({
     open,
     onClose,
@@ -124,7 +154,6 @@ function InquiryModal({
 
             <DialogContent>
                 <Stack spacing={2} sx={{ pt: 1 }}>
-                    {/* Suggested price */}
                     <Box>
                         <Typography variant="body2" sx={{ opacity: 0.75 }}>
                             Suggested price per listing creator
@@ -134,7 +163,6 @@ function InquiryModal({
                         </Typography>
                     </Box>
 
-                    {/* Proposed sum + description */}
                     <Grid container spacing={2}>
                         <Grid item xs={12} md={4}>
                             <TextField
@@ -168,7 +196,6 @@ function InquiryModal({
 
                     <Divider />
 
-                    {/* Requirements header + add */}
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>
                             Requirements
@@ -179,7 +206,6 @@ function InquiryModal({
                         </Button>
                     </Box>
 
-                    {/* Requirements list */}
                     <Stack spacing={2}>
                         {requirements.map((req, idx) => (
                             <Box
@@ -271,6 +297,47 @@ function InquiryModal({
     );
 }
 
+function CommentAvatar({ username, avatar }) {
+    const firstLetter = (username ?? "U").trim().charAt(0).toUpperCase() || "U";
+
+    if (avatar) {
+        return (
+            <Box
+                component="img"
+                src={avatar}
+                alt={username}
+                sx={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    flex: "0 0 auto",
+                }}
+            />
+        );
+    }
+
+    return (
+        <Box
+            sx={{
+                width: 44,
+                height: 44,
+                borderRadius: "50%",
+                bgcolor: "#111827",
+                color: "#f9fafb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 800,
+                fontSize: 16,
+                flex: "0 0 auto",
+            }}
+        >
+            {firstLetter}
+        </Box>
+    );
+}
+
 export default function Listing() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -282,8 +349,8 @@ export default function Listing() {
     const [photos, setPhotos] = useState([]);
     const [activePhoto, setActivePhoto] = useState(null);
 
-    // ✅ modal state
     const [openInquiry, setOpenInquiry] = useState(false);
+    const [comments, setComments] = useState([]);
 
     useEffect(() => {
         let alive = true;
@@ -308,6 +375,18 @@ export default function Listing() {
 
                 setPhotos(p);
                 setActivePhoto(p?.[0]?.photoUrl ?? null);
+
+                let c = [];
+                try {
+                    const commentsRes = await apiGet(`/api/comment/listing/${id}`);
+                    if (!alive) return;
+                    c = normalizeComments(commentsRes);
+                } catch (e) {
+                    console.error("Comments load failed:", e);
+                    c = [];
+                }
+
+                setComments(c);
             } catch (e) {
                 if (!alive) return;
                 setErr(e?.message ?? "Couldn't load listing");
@@ -334,18 +413,14 @@ export default function Listing() {
         try {
             const fd = new FormData();
 
-            // pagrindiniai laukai (vardai turi sutapti su DTO)
             fd.append("FkListingId", String(payload.fkListingId));
             if (payload.proposedSum != null) fd.append("ProposedSum", String(payload.proposedSum));
             fd.append("Description", payload.description ?? "");
 
-            // requirements masyvas (labai svarbūs key pavadinimai)
             (payload.requirements || []).forEach((r, i) => {
                 fd.append(`Requirements[${i}].Description`, r.description ?? "");
 
-                // jei data tuščia – nesiųsk arba siųsk tuščią string
                 if (r.forseenCompletionDate) {
-                    // "YYYY-MM-DD" (iš <input type="date"> toks ir ateina)
                     fd.append(`Requirements[${i}].ForseenCompletionDate`, r.forseenCompletionDate);
                 }
 
@@ -354,13 +429,8 @@ export default function Listing() {
                 }
             });
 
-            // DEBUG (pamatysi ar tikrai dedasi į fd)
-            for (const pair of fd.entries()) console.log("FD:", pair[0], pair[1]);
-
             const res = await apiPostFormData("/api/Inquiries", fd);
             console.log("Created inquiry:", res);
-
-            // optionally: alert arba toast
             alert("Inquiry sent!");
         } catch (e) {
             console.error(e);
@@ -428,7 +498,6 @@ export default function Listing() {
                             </Stack>
 
                             <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
-                                {/* LEFT */}
                                 <Box sx={{ flex: "1 1 auto", minWidth: 0 }}>
                                     <Paper sx={{ p: 2.5, borderRadius: 3 }}>
                                         <Box
@@ -551,13 +620,13 @@ export default function Listing() {
                                     </Paper>
                                 </Box>
 
-                                {/* RIGHT */}
                                 <Box
                                     sx={{
                                         width: 320,
                                         flex: "0 0 320px",
                                         position: "sticky",
                                         top: 88,
+                                        alignSelf: "flex-start",
                                     }}
                                 >
                                     <Paper sx={{ p: 2.5, borderRadius: 3 }}>
@@ -576,7 +645,6 @@ export default function Listing() {
                                         <Divider sx={{ my: 2 }} />
 
                                         <Stack spacing={1.2}>
-                                            {/* ✅ pakeista: atidaro modalą */}
                                             <Button
                                                 variant="contained"
                                                 size="large"
@@ -610,12 +678,79 @@ export default function Listing() {
                                                 • Delivery: {listing.completionTime || "-"}
                                             </Typography>
                                             <Typography variant="body2">• Photos: {photos.length}</Typography>
+                                            <Typography variant="body2">• Comments: {comments.length}</Typography>
                                         </Stack>
                                     </Paper>
                                 </Box>
                             </Box>
 
-                            {/* ✅ MODALAS */}
+                            <Paper sx={{ mt: 4, p: 2.5, borderRadius: 3 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 950, mb: 2 }}>
+                                    Comments
+                                </Typography>
+
+                                {comments.length === 0 ? (
+                                    <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                        No comments yet.
+                                    </Typography>
+                                ) : (
+                                    <Stack spacing={2}>
+                                        {comments.map((c) => (
+                                            <Paper
+                                                key={c.commentId}
+                                                variant="outlined"
+                                                sx={{
+                                                    p: 2,
+                                                    borderRadius: 3,
+                                                }}
+                                            >
+                                                <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                                                    <CommentAvatar
+                                                        username={c.username}
+                                                        avatar={c.avatar}
+                                                    />
+
+                                                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                                                        <Stack
+                                                            direction="row"
+                                                            spacing={1}
+                                                            alignItems="center"
+                                                            flexWrap="wrap"
+                                                            sx={{ mb: 0.5 }}
+                                                        >
+                                                            <Typography
+                                                                variant="body2"
+                                                                sx={{ fontWeight: 800 }}
+                                                            >
+                                                                {c.username}
+                                                            </Typography>
+
+                                                            <Typography
+                                                                variant="caption"
+                                                                sx={{ opacity: 0.65 }}
+                                                            >
+                                                                {formatDate(c.createdAt)}
+                                                            </Typography>
+                                                        </Stack>
+
+                                                        <Typography
+                                                            variant="body2"
+                                                            sx={{
+                                                                whiteSpace: "pre-wrap",
+                                                                lineHeight: 1.7,
+                                                                opacity: 0.92,
+                                                            }}
+                                                        >
+                                                            {c.commentText || "—"}
+                                                        </Typography>
+                                                    </Box>
+                                                </Stack>
+                                            </Paper>
+                                        ))}
+                                    </Stack>
+                                )}
+                            </Paper>
+
                             <InquiryModal
                                 open={openInquiry}
                                 onClose={() => setOpenInquiry(false)}

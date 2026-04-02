@@ -171,66 +171,139 @@ export default function Navbar({ user, onLogout }) {
         }
     }, [user]);
 
+    const navButtonSx = {
+        color: "#f9fafb",
+        px: 1.5,
+        py: 0.8,
+        borderRadius: 2,
+        textTransform: "none",
+        fontWeight: 500,
+        minWidth: "auto",
+        "&:hover": {
+            backgroundColor: "rgba(255,255,255,0.08)",
+        },
+    };
+
+    const activeNavButtonSx = {
+        ...navButtonSx,
+        backgroundColor: "rgba(255,255,255,0.12)",
+        border: "1px solid rgba(255,255,255,0.16)",
+        "&:hover": {
+            backgroundColor: "rgba(255,255,255,0.16)",
+        },
+    };
+
+    const menuPaperSx = {
+        mt: 1,
+        borderRadius: 2.5,
+        minWidth: 220,
+        backgroundColor: "#1f2937",
+        color: "#f9fafb",
+        border: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+        "& .MuiMenuItem-root": {
+            fontSize: 14,
+            borderRadius: 1.5,
+            mx: 0.5,
+            my: 0.25,
+        },
+        "& .MuiMenuItem-root:hover": {
+            backgroundColor: "rgba(255,255,255,0.08)",
+        },
+    };
+
     return (
-        <AppBar position="static">
-            <Toolbar>
-                <Typography variant="h6" sx={{ mr: 2 }}>
-                    Blokų Grandinių Sistema
+        <AppBar
+            position="static"
+            elevation={0}
+            sx={{
+                backgroundColor: "#111827",
+                color: "#f9fafb",
+                borderBottom: "1px solid rgba(255,255,255,0.08)",
+            }}
+        >
+            <Toolbar sx={{ minHeight: 72, gap: 2 }}>
+                <Typography
+                    variant="h6"
+                    sx={{
+                        mr: 1,
+                        fontWeight: 800,
+                        whiteSpace: "nowrap",
+                        color: "#f9fafb",
+                    }}
+                >
+                    Blockchain Service Platform
                 </Typography>
 
-                <Box sx={{ display: "flex", gap: 1 }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        gap: 0.75,
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                    }}
+                >
                     <Button
-                        color="inherit"
                         component={Link}
                         to="/"
-                        variant={currentPath === "/" ? "outlined" : "text"}
+                        variant="text"
+                        sx={currentPath === "/" ? activeNavButtonSx : navButtonSx}
                     >
                         Home
                     </Button>
 
                     <Button
-                        color="inherit"
                         component={Link}
                         to="/work"
-                        variant={currentPath === "/work" ? "outlined" : "text"}
+                        variant="text"
+                        sx={currentPath === "/work" ? activeNavButtonSx : navButtonSx}
                     >
                         Work
                     </Button>
 
                     <Button
-                        color="inherit"
                         component={Link}
                         to="/my-contracts"
-                        variant={currentPath === "/my-contracts" ? "outlined" : "text"}
+                        variant="text"
+                        sx={currentPath === "/my-contracts" ? activeNavButtonSx : navButtonSx}
                     >
                         My Contracts
                     </Button>
 
                     {(userRole === "Admin" || userRole === "Seller") && (
                         <Button
-                            color="inherit"
                             component={Link}
                             to="/my-inquiries"
-                            variant={currentPath === "/my-inquiries" ? "outlined" : "text"}
+                            variant="text"
+                            sx={currentPath === "/my-inquiries" ? activeNavButtonSx : navButtonSx}
                         >
                             My Inquiries
                         </Button>
                     )}
 
                     <Button
-                        color="inherit"
                         component={Link}
                         to="/my-mysentinquiries"
-                        variant={currentPath === "/my-mysentinquiries" ? "outlined" : "text"}
+                        variant="text"
+                        sx={currentPath === "/my-mysentinquiries" ? activeNavButtonSx : navButtonSx}
                     >
                         My Sent Inquiries
                     </Button>
 
                     <Button
-                        color="inherit"
+                        component={Link}
+                        to="/my-completed-contracts-comments"
+                        variant="text"
+                        sx={currentPath === "/my-completed-contracts-comments" ? activeNavButtonSx : navButtonSx}
+                    >
+                        My Comments
+                    </Button>
+
+                    <Button
                         component={Link}
                         to="/about"
-                        variant={currentPath === "/about" ? "outlined" : "text"}
+                        variant="text"
+                        sx={currentPath === "/about" ? activeNavButtonSx : navButtonSx}
                     >
                         About
                     </Button>
@@ -240,16 +313,25 @@ export default function Navbar({ user, onLogout }) {
 
                 {!user ? (
                     <Button
-                        color="inherit"
                         component={Link}
                         to="/login"
-                        variant={currentPath === "/login" ? "outlined" : "text"}
+                        variant="text"
+                        sx={currentPath === "/login" ? activeNavButtonSx : navButtonSx}
                     >
                         Login
                     </Button>
                 ) : (
                     <>
-                        <IconButton color="inherit" onClick={openNotifMenu}>
+                        <IconButton
+                            onClick={openNotifMenu}
+                            sx={{
+                                color: "#f9fafb",
+                                borderRadius: 2,
+                                "&:hover": {
+                                    backgroundColor: "rgba(255,255,255,0.08)",
+                                },
+                            }}
+                        >
                             <Badge badgeContent={unreadCount} color="error">
                                 <NotificationsIcon />
                             </Badge>
@@ -263,20 +345,25 @@ export default function Navbar({ user, onLogout }) {
                             sx={{
                                 cursor: "pointer",
                                 px: 1.5,
-                                py: 0.75,
+                                py: 0.9,
                                 borderRadius: 2,
-                                bgcolor: "rgba(255,255,255,0.12)",
-                                color: "inherit",
+                                bgcolor: "rgba(255,255,255,0.10)",
+                                border: "1px solid rgba(255,255,255,0.10)",
+                                color: "#f9fafb",
                                 userSelect: "none",
                                 display: "flex",
                                 alignItems: "center",
-                                gap: 1
+                                gap: 1,
+                                transition: "0.15s",
+                                "&:hover": {
+                                    bgcolor: "rgba(255,255,255,0.14)",
+                                },
                             }}
                         >
-                            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                            <Typography variant="body2" sx={{ opacity: 0.85 }}>
                                 Welcome,
                             </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 700 }}>
                                 {displayName}
                             </Typography>
                         </Paper>
@@ -287,6 +374,7 @@ export default function Navbar({ user, onLogout }) {
                             onClose={closeMenu}
                             anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                             transformOrigin={{ vertical: "top", horizontal: "right" }}
+                            PaperProps={{ sx: menuPaperSx }}
                         >
                             <MenuItem onClick={() => go("/my-profile")}>My Profile</MenuItem>
 
@@ -294,7 +382,7 @@ export default function Navbar({ user, onLogout }) {
                                 <MenuItem onClick={() => go("/my-listings")}>My Listings</MenuItem>
                             )}
 
-                            {userRole === "Admin" && <Divider />}
+                            {userRole === "Admin" && <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />}
 
                             {userRole === "Admin" && (
                                 <MenuItem onClick={() => go("/admin/listings")}>
@@ -308,7 +396,7 @@ export default function Navbar({ user, onLogout }) {
                                 </MenuItem>
                             )}
 
-                            <Divider />
+                            <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
                             <MenuItem onClick={handleLogout}>Logout</MenuItem>
                         </Menu>
 
@@ -318,25 +406,47 @@ export default function Navbar({ user, onLogout }) {
                             onClose={closeNotifMenu}
                             anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                             transformOrigin={{ vertical: "top", horizontal: "right" }}
+                            PaperProps={{
+                                sx: {
+                                    ...menuPaperSx,
+                                    minWidth: 320,
+                                    maxWidth: 380,
+                                }
+                            }}
                         >
-                            <MenuItem disabled>
-                                <Typography sx={{ fontWeight: 700 }}>Notifications</Typography>
+                            <MenuItem disabled sx={{ opacity: 1 }}>
+                                <Typography sx={{ fontWeight: 700, color: "#f9fafb" }}>
+                                    Notifications
+                                </Typography>
                             </MenuItem>
 
                             <MenuItem onClick={markAllAsRead}>Mark all as read</MenuItem>
 
-                            <Divider />
+                            <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
 
                             {notifications.length === 0 ? (
                                 <MenuItem disabled>No notifications</MenuItem>
                             ) : (
                                 notifications.slice(0, 8).map((n) => (
-                                    <MenuItem key={n.notificationId} onClick={() => markAsReadAndGo(n)}>
+                                    <MenuItem
+                                        key={n.notificationId}
+                                        onClick={() => markAsReadAndGo(n)}
+                                        sx={{
+                                            alignItems: "flex-start",
+                                            py: 1.2,
+                                        }}
+                                    >
                                         <ListItemText
                                             primary={n.title}
                                             secondary={n.message || ""}
                                             primaryTypographyProps={{
-                                                fontWeight: n.isRead ? 400 : 700
+                                                fontWeight: n.isRead ? 500 : 700,
+                                                color: "#f9fafb",
+                                                fontSize: 14,
+                                            }}
+                                            secondaryTypographyProps={{
+                                                color: "rgba(249,250,251,0.72)",
+                                                fontSize: 13,
                                             }}
                                         />
                                     </MenuItem>
@@ -349,194 +459,3 @@ export default function Navbar({ user, onLogout }) {
         </AppBar>
     );
 }
-
-
-//import { AppBar, Toolbar, Button, Typography, Box, Paper, Menu, MenuItem, Divider } from "@mui/material";
-//import { Link, useLocation, useNavigate } from "react-router-dom";
-//import { useMemo, useState } from "react";
-
-//export default function Navbar({ user, onLogout }) {
-//    const location = useLocation();
-//    const navigate = useNavigate();
-//    const currentPath = location.pathname;
-
-//    const [anchorEl, setAnchorEl] = useState(null);
-//    const menuOpen = Boolean(anchorEl);
-
-//    const displayName = useMemo(() => {
-//        // jei user turi username, rodau jį jei neturi – rodom "User"
-//        return user?.username ?? "User";
-//    }, [user]);
-
-//    function getUserRoleFromToken() {
-//        const token = localStorage.getItem("token");
-//        if (!token) return null;
-
-//        try {
-//            const payload = JSON.parse(atob(token.split(".")[1]));
-
-//            return (
-//                payload.role ||
-//                payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ||
-//                null
-//            );
-//        } catch {
-//            return null;
-//        }
-//    }
-
-//    const openMenu = (e) => setAnchorEl(e.currentTarget);
-//    const closeMenu = () => setAnchorEl(null);
-
-//    const go = (path) => {
-//        closeMenu();
-//        navigate(path);
-//    };
-
-//    const handleLogout = () => {
-//        closeMenu();
-//        onLogout();
-//        navigate("/");
-//    };
-
-
-
-//    const userRole = getUserRoleFromToken();
-
-//    console.log("ROLE:", userRole);
-
-//    return (
-//        <AppBar position="static">
-//            <Toolbar>
-//                <Typography variant="h6" sx={{ mr: 2 }}>
-//                    Blokų Grandinių Sistema
-//                </Typography>
-
-//                {/* Left menu */}
-//                <Box sx={{ display: "flex", gap: 1 }}>
-//                    <Button
-//                        color="inherit"
-//                        component={Link}
-//                        to="/"
-//                        variant={currentPath === "/" ? "outlined" : "text"}
-//                    >
-//                        Home
-//                    </Button>
-//                    <Button
-//                        color="inherit"
-//                        component={Link}
-//                        to="/work"
-//                        variant={currentPath === "/work" ? "outlined" : "text"}
-//                    >
-//                        Work
-//                    </Button>
-//                    <Button
-//                        color="inherit"
-//                        component={Link}
-//                        to="/my-contracts"
-//                        variant={currentPath === "/my-contracts" ? "outlined" : "text"}
-//                    >
-//                        My Contracts
-//                    </Button>
-
-//                    {(userRole === "Admin" || userRole === "Seller")  && (
-//                        <Button
-//                            color="inherit"
-//                            component={Link}
-//                            to="/my-inquiries"
-//                            variant={currentPath === "/my-inquiries" ? "outlined" : "text"}
-//                        >
-//                            My Inquiries
-//                        </Button>
-//                    )}
-//                    <Button
-//                        color="inherit"
-//                        component={Link}
-//                        to="/my-mysentinquiries"
-//                        variant={currentPath === "/my-mysentinquiries" ? "outlined" : "text"}
-//                    >
-//                        My Sent Inquiries
-//                    </Button>
-//                    <Button
-//                        color="inherit"
-//                        component={Link}
-//                        to="/about"
-//                        variant={currentPath === "/about" ? "outlined" : "text"}
-//                    >
-//                        About
-//                    </Button>
-//                </Box>
-
-//                <Box sx={{ flexGrow: 1 }} />
-
-//                {!user ? (
-//                    <Button
-//                        color="inherit"
-//                        component={Link}
-//                        to="/login"
-//                        variant={currentPath === "/login" ? "outlined" : "text"}
-//                    >
-//                        Login
-//                    </Button>
-//                ) : (
-//                    <>
-//                        {/* Welcome box (clickable) */}
-//                        <Paper
-//                            onClick={openMenu}
-//                            role="button"
-//                            tabIndex={0}
-//                            elevation={0}
-//                            sx={{
-//                                cursor: "pointer",
-//                                px: 1.5,
-//                                py: 0.75,
-//                                borderRadius: 2,
-//                                bgcolor: "rgba(255,255,255,0.12)",
-//                                color: "inherit",
-//                                userSelect: "none",
-//                                display: "flex",
-//                                alignItems: "center",
-//                                gap: 1
-//                            }}
-//                        >
-//                            <Typography variant="body2" sx={{ opacity: 0.9 }}>
-//                                Welcome,
-//                            </Typography>
-//                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-//                                {displayName}
-//                            </Typography>
-//                        </Paper>
-
-//                        <Menu
-//                            anchorEl={anchorEl}
-//                            open={menuOpen}
-//                            onClose={closeMenu}
-//                            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-//                            transformOrigin={{ vertical: "top", horizontal: "right" }}
-//                            >
-//                                <MenuItem onClick={() => go("/my-profile")}>My Profile</MenuItem>
-//                                {(userRole === "Admin" || userRole === "Seller") && (
-//                                    <MenuItem onClick={() => go("/my-listings")}>My Listings</MenuItem>
-//                                )}
-//                                {userRole === "Admin" && <Divider />}
-
-//                                {userRole === "Admin" && (
-//                                    <MenuItem onClick={() => go("/admin/listings")}>
-//                                        Listing Monitoring
-//                                    </MenuItem>
-//                                )}
-
-//                                {userRole === "Admin" && (
-//                                    <MenuItem onClick={() => go("/admin/users")}>
-//                                        User Profile Monitoring
-//                                    </MenuItem>
-//                                )}
-//                            <Divider />
-//                            <MenuItem onClick={handleLogout}>Logout</MenuItem>
-//                        </Menu>
-//                    </>
-//                )}
-//            </Toolbar>
-//        </AppBar>
-//    );
-//}

@@ -3,10 +3,8 @@ import {
     Avatar,
     Box,
     Button,
-    Container,
     Grid,
     IconButton,
-    Paper,
     Stack,
     TextField,
     Typography,
@@ -19,6 +17,7 @@ import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import { useNavigate } from "react-router-dom";
+import { PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
 export default function AddListing() {
     const navigate = useNavigate();
@@ -76,7 +75,6 @@ export default function AddListing() {
                 });
             }
 
-            // jei dar nėra primary — padarom pirmą kaip primary
             if (!next.some((p) => p.isPrimary) && next.length > 0) {
                 next[0].isPrimary = true;
             }
@@ -84,7 +82,6 @@ export default function AddListing() {
             return next;
         });
 
-        // leidžia vėl pasirinkti tą patį failą
         e.target.value = "";
     };
 
@@ -114,8 +111,6 @@ export default function AddListing() {
         const primary = photos.find((p) => p.isPrimary);
         const fd = new FormData();
 
-        // backend’e darysim DTO: Files + PrimaryIndex (arba PrimaryTempId)
-        // čia paprasčiausia: siunčiam failus eilės tvarka ir PrimaryIndex
         photos.forEach((p) => fd.append("Files", p.file));
         fd.append("PrimaryIndex", String(Math.max(0, photos.findIndex((p) => p.id === primary?.id))));
 
@@ -123,7 +118,6 @@ export default function AddListing() {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${token}`
-                // content-type nededam, nes FormData
             },
             body: fd
         });
@@ -138,12 +132,12 @@ export default function AddListing() {
         if (!token) return navigate("/login");
 
         if (!selectedCategory) {
-            alert("Pasirink kategoriją");
+            alert("Please choose a category.");
             return;
         }
 
         if (!title.trim()) {
-            alert("Įvesk Title");
+            alert("Please enter a title.");
             return;
         }
 
@@ -170,20 +164,17 @@ export default function AddListing() {
 
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Klaida: ${res.status} ${txt}`);
+                alert(`Error: ${res.status} ${txt}`);
                 return;
             }
 
-            // CreatedAtAction grąžina listing objektą — pas tave grąžina "listing"
             const created = await res.json();
             const listingId = created?.listingId ?? created?.listingID ?? created?.id;
 
             if (!listingId) {
-                // jei backend grąžina kitokį json — pakeisim vėliau
                 throw new Error("No listingId returned from backend.");
             }
 
-            // upload photos
             await uploadPhotos(listingId);
 
             navigate("/my-listings");
@@ -198,20 +189,23 @@ export default function AddListing() {
     const primaryPhoto = photos.find((p) => p.isPrimary) ?? null;
 
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
-            <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-                Add Listing
-            </Typography>
+        <PageShell
+            maxWidth="xl"
+            compact
+            hero={
+                <PageHero
+                    eyebrow="Create listing"
+                    title="Publish a new service offer."
+                    subtitle="Add visuals, pricing, delivery time, and a clear description so your listing looks ready for a professional marketplace."
+                />
+            }
+        >
 
             <Grid container spacing={2}>
-                {/* LEFT - Photos */}
                 <Grid item xs={12} md={4}>
-                    <Paper sx={{ p: 2 }}>
+                    <SectionCard title="Photos" subtitle="Upload multiple images and choose one primary preview.">
                         <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>
-                            Photos
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
-                           You can upload multiple photos
+                            Media
                         </Typography>
 
                         <Stack spacing={2}>
@@ -247,7 +241,7 @@ export default function AddListing() {
 
                             {photos.length === 0 ? (
                                 <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                    No photos
+                                            No photos added
                                 </Typography>
                             ) : (
                                 <>
@@ -311,12 +305,11 @@ export default function AddListing() {
                                 </>
                             )}
                         </Stack>
-                    </Paper>
+                    </SectionCard>
                 </Grid>
 
-                {/* RIGHT - Form */}
                 <Grid item xs={12} md={8}>
-                    <Paper sx={{ p: 2 }}>
+                    <SectionCard title="Listing details" subtitle="Describe the service, define your category, and set the expected budget and delivery time.">
                         <Stack spacing={2}>
                             <TextField
                                 label="Title"
@@ -386,9 +379,9 @@ export default function AddListing() {
                                 </Button>
                             </Stack>
                         </Stack>
-                    </Paper>
+                    </SectionCard>
                 </Grid>
             </Grid>
-        </Container>
+        </PageShell>
     );
 }

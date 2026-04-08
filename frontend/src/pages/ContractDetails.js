@@ -22,6 +22,8 @@ import {
     ESCROW_ADDRESS
 } from "../blockchain/escrow";
 
+const DEFAULT_ESCROW_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+
 function money(v) {
     if (v == null || v === "") return "—";
     const n = Number(v);
@@ -67,6 +69,10 @@ function normalizeContract(raw) {
                 milestoneId: m.milestoneId ?? m.MilestoneId,
                 milestoneNo: m.milestoneNo ?? m.MilestoneNo,
                 requirementId: m.requirementId ?? m.RequirementId ?? null,
+                requirementDescription:
+                    m.requirementDescription ??
+                    m.RequirementDescription ??
+                    "",
                 amountEurSnapshot: m.amountEurSnapshot ?? m.AmountEurSnapshot ?? null,
                 amountEth: m.amountEth ?? m.AmountEth ?? null,
                 status: m.status ?? m.Status ?? "",
@@ -210,6 +216,7 @@ export default function ContractDetails() {
     const [fragmentsBusy, setFragmentsBusy] = useState(false);
     const [fragmentsErr, setFragmentsErr] = useState("");
     const [fragmentsData, setFragmentsData] = useState(null);
+    const [expandedFragmentMilestones, setExpandedFragmentMilestones] = useState({});
     const [reviewInputs, setReviewInputs] = useState({});
 
     const [messagesLoading, setMessagesLoading] = useState(false);
@@ -236,6 +243,28 @@ export default function ContractDetails() {
         const arr = item?.milestones ?? [];
         return arr.reduce((sum, m) => sum + Number(m.amountEth ?? 0), 0);
     }, [item]);
+
+    const fragmentGroups = useMemo(() => {
+        const fragments = Array.isArray(fragmentsData?.fragments) ? fragmentsData.fragments : [];
+        const milestones = Array.isArray(item?.milestones) ? item.milestones : [];
+
+        return milestones.map((milestone) => {
+            const milestoneFragments = fragments
+                .filter((fragment) => Number(fragment.milestoneId) === Number(milestone.milestoneId))
+                .sort((a, b) => {
+                    const aTime = new Date(a.updatedAt || a.submittedAt || a.createdAt || 0).getTime();
+                    const bTime = new Date(b.updatedAt || b.submittedAt || b.createdAt || 0).getTime();
+                    return bTime - aTime;
+                });
+
+            return {
+                ...milestone,
+                fragments: milestoneFragments,
+                latestFragment: milestoneFragments[0] ?? null,
+                hasHistory: milestoneFragments.length > 1
+            };
+        });
+    }, [fragmentsData, item]);
 
     const canCreateOnChain =
         isProvider &&
@@ -282,6 +311,13 @@ export default function ContractDetails() {
     };
 
     const getReviewValue = (fragmentId) => reviewInputs[fragmentId] ?? "";
+
+    const toggleFragmentMilestone = (milestoneId) => {
+        setExpandedFragmentMilestones((prev) => ({
+            ...prev,
+            [milestoneId]: !prev[milestoneId]
+        }));
+    };
 
     const loadMessages = async () => {
         try {
@@ -411,7 +447,7 @@ export default function ContractDetails() {
             await apiPostJson(`/api/contracts/${item.contractId}/on-chain-created`, {
                 clientWalletAddress,
                 providerWalletAddress,
-                smartContractAddress: ESCROW_ADDRESS,
+                smartContractAddress: ESCROW_ADDRESS || DEFAULT_ESCROW_ADDRESS,
                 chainProjectId: result.projectId
             });
 
@@ -509,6 +545,10 @@ export default function ContractDetails() {
                 throw new Error("Contract does not have chainProjectId yet.");
             }
 
+            if (!item?.fundedAmountEth || item.status === "PendingFunding") {
+                throw new Error("Contract must be funded before approving a submitted fragment.");
+            }
+
             const previewRaw = await apiGet(
                 `/api/inquiries/contracts/${contractId}/fragments/${fragment.fragmentId}/settlement-preview`
             );
@@ -591,8 +631,19 @@ export default function ContractDetails() {
         if (!isProvider) return false;
         if (!item) return false;
         if (busy || fragmentsBusy) return false;
+        if (!item.chainProjectId) return false;
+        if (!item.fundedAmountEth || item.status === "PendingFunding") return false;
         if (item.status === "Completed" || item.status === "Closed") return false;
         if (milestone.status === "Released" || milestone.status === "ReleasedPartial") return false;
+        if (
+            fragmentsData?.fragments?.some(
+                (f) =>
+                    Number(f.milestoneId) === Number(milestone.milestoneId) &&
+                    f.status === "Submitted"
+            )
+        ) {
+            return false;
+        }
 
         return true;
     };
@@ -600,6 +651,7 @@ export default function ContractDetails() {
     const canClientReviewFragment = (fragment) => {
         if (!isClient) return false;
         if (!item?.chainProjectId) return false;
+        if (!item?.fundedAmountEth || item.status === "PendingFunding") return false;
         if (fragmentsBusy) return false;
         return fragment.status === "Submitted";
     };
@@ -608,6 +660,222 @@ export default function ContractDetails() {
         if (!filePath) return null;
         if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
         return `https://localhost:7278${filePath}`;
+    };
+
+    const getFragmentStatusColor = (status) => {
+        if (status === "Approved" || status === "ApprovedPartial") return "success";
+        if (status === "Rejected" || status === "UnderRevision") return "error";
+        if (status === "Submitted") return "warning";
+        return "default";
+    };
+
+    const getFragmentStatusStyles = (status, variant = "latest") => {
+        if (status === "Approved" || status === "ApprovedPartial") {
+            return {
+                headerBg: "#ecfdf5",
+                cardBg: variant === "latest" ? "#f0fdf4" : "#f7fef9",
+                borderColor: "#86efac"
+            };
+        }
+
+        if (status === "Rejected" || status === "UnderRevision") {
+            return {
+                headerBg: "#fef2f2",
+                cardBg: variant === "latest" ? "#fff5f5" : "#fff8f8",
+                borderColor: "#fca5a5"
+            };
+        }
+
+        if (status === "Submitted") {
+            return {
+                headerBg: "#fffbeb",
+                cardBg: variant === "latest" ? "#fffdf4" : "#fffef8",
+                borderColor: "#fcd34d"
+            };
+        }
+
+        return {
+            headerBg: "#f8fafc",
+            cardBg: variant === "latest" ? "#fcfffe" : "#fafafa",
+            borderColor: "#cbd5e1"
+        };
+    };
+
+    const renderFragmentCard = (fragment, variant = "latest") => {
+        const canReview = canClientReviewFragment(fragment);
+        const fileHref = resolveFileHref(fragment.filePath);
+        const statusStyles = getFragmentStatusStyles(fragment.status, variant);
+
+        return (
+            <Paper
+                key={fragment.fragmentId}
+                variant="outlined"
+                sx={{
+                    p: 0,
+                    borderRadius: 2.5,
+                    bgcolor: statusStyles.cardBg,
+                    borderColor: statusStyles.borderColor,
+                    overflow: "hidden"
+                }}
+            >
+                <Box sx={{ px: 1.5, py: 1.1, bgcolor: statusStyles.headerBg, borderBottom: "1px solid", borderColor: statusStyles.borderColor }}>
+                    <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        justifyContent="space-between"
+                        alignItems={{ xs: "flex-start", sm: "center" }}
+                    >
+                        <Box>
+                            <Typography sx={{ fontWeight: 900 }}>
+                                {fragment.title || `Fragment #${fragment.fragmentId}`}
+                            </Typography>
+                            <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                Submitted at: {safeDate(fragment.submittedAt)}
+                            </Typography>
+                        </Box>
+
+                        <Chip
+                            label={fragment.status || "Unknown"}
+                            color={getFragmentStatusColor(fragment.status)}
+                            variant="filled"
+                            sx={{ fontWeight: 800 }}
+                        />
+                    </Stack>
+                </Box>
+
+                <Box sx={{ p: 1.5 }}>
+                    <Stack spacing={1}>
+                        <Box
+                            sx={{
+                                p: 1.25,
+                                border: "1px solid",
+                                borderColor: "rgba(15, 23, 42, 0.08)",
+                                bgcolor: "rgba(255,255,255,0.72)"
+                            }}
+                        >
+                            <Typography variant="body2" sx={{ opacity: 0.7, mb: 0.35 }}>
+                                Description
+                            </Typography>
+                            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                                {fragment.description || "—"}
+                            </Typography>
+                        </Box>
+
+                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                            <Box
+                                sx={{
+                                    flex: 1,
+                                    p: 1.15,
+                                    border: "1px solid",
+                                    borderColor: "rgba(15, 23, 42, 0.08)",
+                                    bgcolor: "rgba(255,255,255,0.72)"
+                                }}
+                            >
+                                <Typography variant="caption" sx={{ display: "block", opacity: 0.65 }}>
+                                    File
+                                </Typography>
+                                <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                                    {fileHref ? (
+                                        <a href={fileHref} target="_blank" rel="noreferrer">
+                                            Open file
+                                        </a>
+                                    ) : "—"}
+                                </Typography>
+                            </Box>
+
+                            <Box
+                                sx={{
+                                    flex: 1,
+                                    p: 1.15,
+                                    border: "1px solid",
+                                    borderColor: "rgba(15, 23, 42, 0.08)",
+                                    bgcolor: "rgba(255,255,255,0.72)"
+                                }}
+                            >
+                                <Typography variant="caption" sx={{ display: "block", opacity: 0.65 }}>
+                                    Approved at
+                                </Typography>
+                                <Typography variant="body2">{safeDate(fragment.approvedAt)}</Typography>
+                            </Box>
+                        </Stack>
+
+                        <Box
+                            sx={{
+                                p: 1.15,
+                                border: "1px solid",
+                                borderColor: "rgba(15, 23, 42, 0.08)",
+                                bgcolor: "rgba(255,255,255,0.72)"
+                            }}
+                        >
+                            <Typography variant="caption" sx={{ display: "block", opacity: 0.65 }}>
+                                Review comment
+                            </Typography>
+                            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                                {fragment.reviewComment || "—"}
+                            </Typography>
+                        </Box>
+
+                        <Box
+                            sx={{
+                                p: 1.15,
+                                border: "1px solid",
+                                borderColor: "rgba(15, 23, 42, 0.08)",
+                                bgcolor: "rgba(255,255,255,0.72)"
+                            }}
+                        >
+                            <Typography variant="caption" sx={{ display: "block", opacity: 0.65 }}>
+                                Transaction hash
+                            </Typography>
+                            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                                {fragment.releaseTxHash || "—"}
+                            </Typography>
+                        </Box>
+
+                        {canReview && (
+                            <>
+                                <TextField
+                                    label="Review comment"
+                                    multiline
+                                    minRows={2}
+                                    fullWidth
+                                    value={getReviewValue(fragment.fragmentId)}
+                                    onChange={(e) =>
+                                        setReviewValue(fragment.fragmentId, e.target.value)
+                                    }
+                                    disabled={fragmentsBusy}
+                                />
+
+                                <Stack
+                                    direction={{ xs: "column", sm: "row" }}
+                                    spacing={1}
+                                    justifyContent="flex-end"
+                                >
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        onClick={() => onRejectFragment(fragment)}
+                                        disabled={fragmentsBusy}
+                                        sx={{ fontWeight: 800 }}
+                                    >
+                                        {fragmentsBusy ? "Please wait..." : "Reject"}
+                                    </Button>
+
+                                    <Button
+                                        variant="contained"
+                                        color="success"
+                                        onClick={() => onApproveFragment(fragment)}
+                                        disabled={fragmentsBusy}
+                                        sx={{ fontWeight: 800 }}
+                                    >
+                                        {fragmentsBusy ? "Please wait..." : "Approve"}
+                                    </Button>
+                                </Stack>
+                            </>
+                        )}
+                    </Stack>
+                </Box>
+            </Paper>
+        );
     };
 
     return (
@@ -653,7 +921,7 @@ export default function ContractDetails() {
                         </Stack>
 
                         <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                            Smart contract: {item.smartContractAddress || "—"}
+                            Smart contract: {item.smartContractAddress || ESCROW_ADDRESS || DEFAULT_ESCROW_ADDRESS}
                         </Typography>
                         <Typography variant="body2" sx={{ opacity: 0.8 }}>
                             Chain project ID: {item.chainProjectId ?? "—"}
@@ -705,6 +973,12 @@ export default function ContractDetails() {
                                         <Typography sx={{ fontWeight: 800 }}>
                                             Milestone #{m.milestoneNo}
                                         </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            sx={{ mt: 0.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                                        >
+                                            Task: {m.requirementDescription || "No task description provided."}
+                                        </Typography>
                                         <Typography variant="body2" sx={{ opacity: 0.85 }}>
                                             EUR snapshot: {money(m.amountEurSnapshot)}
                                         </Typography>
@@ -720,6 +994,15 @@ export default function ContractDetails() {
                                         <Typography variant="body2" sx={{ opacity: 0.75 }}>
                                             Released at: {safeDate(m.releasedAt)}
                                         </Typography>
+                                        {fragmentsData?.fragments?.some(
+                                            (f) =>
+                                                Number(f.milestoneId) === Number(m.milestoneId) &&
+                                                f.status === "Submitted"
+                                        ) && (
+                                            <Typography variant="body2" sx={{ mt: 0.75, color: "warning.main", fontWeight: 700 }}>
+                                                A fragment for this milestone is already submitted and waiting for approval.
+                                            </Typography>
+                                        )}
                                     </Box>
 
                                     {canProviderSubmitForMilestone(m) && (
@@ -808,100 +1091,94 @@ export default function ContractDetails() {
                         </Paper>
                     ) : (
                         <Stack spacing={1.2}>
-                            {!fragmentsData?.fragments?.length ? (
+                            {!fragmentGroups.some((group) => group.fragments.length) ? (
                                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
                                     <Typography variant="body2" sx={{ opacity: 0.7 }}>
                                         No fragments submitted yet.
                                     </Typography>
                                 </Paper>
                             ) : (
-                                fragmentsData.fragments.map((f) => {
-                                    const canReview = canClientReviewFragment(f);
-                                    const fileHref = resolveFileHref(f.filePath);
+                                fragmentGroups
+                                    .filter((group) => group.fragments.length)
+                                    .map((group) => {
+                                        const expanded = !!expandedFragmentMilestones[group.milestoneId];
+                                        const historicalFragments = expanded
+                                            ? group.fragments.slice(1)
+                                            : [];
 
-                                    return (
-                                        <Paper
-                                            key={f.fragmentId}
-                                            variant="outlined"
-                                            sx={{ p: 1.5, borderRadius: 2.5 }}
-                                        >
-                                            <Stack spacing={1}>
-                                                <Box>
-                                                    <Typography sx={{ fontWeight: 800 }}>
-                                                        {f.title || `Fragment #${f.fragmentId}`}
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                                        Milestone ID: {f.milestoneId}
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                                        Status: {f.status}
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                                        Submitted at: {safeDate(f.submittedAt)}
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                                        Description: {f.description || "—"}
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                                        File: {fileHref ? (
-                                                            <a href={fileHref} target="_blank" rel="noreferrer">
-                                                                Open file
-                                                            </a>
-                                                        ) : "—"}
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                                                        Review comment: {f.reviewComment || "—"}
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                                                        Tx hash: {f.releaseTxHash || "—"}
-                                                    </Typography>
+                                        return (
+                                            <Paper
+                                                key={group.milestoneId}
+                                                variant="outlined"
+                                                sx={{ p: 0, borderRadius: 2.5, overflow: "hidden" }}
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        px: 2,
+                                                        py: 1.5,
+                                                        bgcolor: "#f8fafc",
+                                                        borderBottom: "1px solid",
+                                                        borderColor: "divider"
+                                                    }}
+                                                >
+                                                    <Stack
+                                                        direction={{ xs: "column", sm: "row" }}
+                                                        spacing={1}
+                                                        justifyContent="space-between"
+                                                        alignItems={{ xs: "flex-start", sm: "center" }}
+                                                    >
+                                                        <Box>
+                                                            <Typography sx={{ fontWeight: 900 }}>
+                                                                Milestone #{group.milestoneNo}
+                                                            </Typography>
+                                                            <Typography
+                                                                variant="body2"
+                                                                sx={{ opacity: 0.75, whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                                                            >
+                                                                Task: {group.requirementDescription || "No task description provided."}
+                                                            </Typography>
+                                                        </Box>
+
+                                                        <Stack direction="row" spacing={1} flexWrap="wrap">
+                                                            <Chip
+                                                                label={`${group.fragments.length} fragment${group.fragments.length === 1 ? "" : "s"}`}
+                                                                variant="outlined"
+                                                            />
+                                                            {group.hasHistory && (
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    onClick={() => toggleFragmentMilestone(group.milestoneId)}
+                                                                    sx={{ fontWeight: 800 }}
+                                                                >
+                                                                    {expanded ? "Hide history" : "Expand history"}
+                                                                </Button>
+                                                            )}
+                                                        </Stack>
+                                                    </Stack>
                                                 </Box>
 
-                                                {canReview && (
-                                                    <>
-                                                        <TextField
-                                                            label="Review comment"
-                                                            multiline
-                                                            minRows={2}
-                                                            fullWidth
-                                                            value={getReviewValue(f.fragmentId)}
-                                                            onChange={(e) =>
-                                                                setReviewValue(f.fragmentId, e.target.value)
-                                                            }
-                                                            disabled={fragmentsBusy}
-                                                        />
+                                                <Box sx={{ p: 1.5 }}>
+                                                    <Stack spacing={1.2}>
+                                                        {group.latestFragment && renderFragmentCard(group.latestFragment)}
 
-                                                        <Stack
-                                                            direction={{ xs: "column", sm: "row" }}
-                                                            spacing={1}
-                                                            justifyContent="flex-end"
-                                                        >
-                                                            <Button
-                                                                variant="outlined"
-                                                                color="error"
-                                                                onClick={() => onRejectFragment(f)}
-                                                                disabled={fragmentsBusy}
-                                                                sx={{ fontWeight: 800 }}
-                                                            >
-                                                                {fragmentsBusy ? "Please wait..." : "Reject"}
-                                                            </Button>
-
-                                                            <Button
-                                                                variant="contained"
-                                                                color="success"
-                                                                onClick={() => onApproveFragment(f)}
-                                                                disabled={fragmentsBusy}
-                                                                sx={{ fontWeight: 800 }}
-                                                            >
-                                                                {fragmentsBusy ? "Please wait..." : "Approve"}
-                                                            </Button>
-                                                        </Stack>
-                                                    </>
-                                                )}
-                                            </Stack>
-                                        </Paper>
-                                    );
-                                })
+                                                        {expanded && historicalFragments.length > 0 && (
+                                                            <Box sx={{ pt: 0.5 }}>
+                                                                <Typography sx={{ fontWeight: 800, mb: 1 }}>
+                                                                    Previous fragments
+                                                                </Typography>
+                                                                <Stack spacing={1}>
+                                                                    {historicalFragments.map((fragment) =>
+                                                                        renderFragmentCard(fragment, "history")
+                                                                    )}
+                                                                </Stack>
+                                                            </Box>
+                                                        )}
+                                                    </Stack>
+                                                </Box>
+                                            </Paper>
+                                        );
+                                    })
                             )}
                         </Stack>
                     )}
@@ -1024,7 +1301,7 @@ export default function ContractDetails() {
 
                             {!messagesData?.canSendMessages && (
                                 <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                                    Messages can only be sent when the contract is Funded or InProgress.
+                                    Messages are disabled only after the contract is completed.
                                 </Typography>
                             )}
 
@@ -1061,90 +1338,187 @@ export default function ContractDetails() {
                             <Typography>{ratingErr}</Typography>
                         </Paper>
                     ) : hasExistingRating ? (
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-                            <Stack spacing={1}>
-                                <Typography sx={{ fontWeight: 800 }}>
-                                    Your rating
+                        <Paper variant="outlined" sx={{ p: 0, borderRadius: 2.5, overflow: "hidden" }}>
+                            <Box sx={{ px: 2, py: 1.5, bgcolor: "#f0fdfa", borderBottom: "1px solid", borderColor: "divider" }}>
+                                <Typography sx={{ fontWeight: 900 }}>
+                                    Rating submitted
                                 </Typography>
-
-                                <Rating
-                                    value={Number(ratingData?.userRating ?? 0)}
-                                    readOnly
-                                />
-
-                                <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                    Comment: {ratingData?.userRatingComment || "—"}
+                                <Typography variant="body2" sx={{ opacity: 0.75 }}>
+                                    Your feedback for this contract has already been saved.
                                 </Typography>
+                            </Box>
 
-                                <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                    System rating: {ratingData?.systemRating ?? "—"}
-                                </Typography>
+                            <Box sx={{ p: 2 }}>
+                                <Stack spacing={1.5}>
+                                    <Box
+                                        sx={{
+                                            p: 1.5,
+                                            border: "1px solid",
+                                            borderColor: "divider",
+                                            bgcolor: "#fcfffe"
+                                        }}
+                                    >
+                                        <Typography variant="body2" sx={{ opacity: 0.75, mb: 0.5 }}>
+                                            Your rating
+                                        </Typography>
+                                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "flex-start", sm: "center" }}>
+                                            <Rating
+                                                value={Number(ratingData?.userRating ?? 0)}
+                                                readOnly
+                                            />
+                                            <Typography sx={{ fontWeight: 800 }}>
+                                                {ratingData?.userRating ?? "—"}/5
+                                            </Typography>
+                                        </Stack>
+                                    </Box>
 
-                                <Typography variant="body2" sx={{ opacity: 0.75, whiteSpace: "pre-wrap" }}>
-                                    System rating reason: {ratingData?.systemRatingReason || "—"}
-                                </Typography>
+                                    <Box
+                                        sx={{
+                                            p: 1.5,
+                                            border: "1px solid",
+                                            borderColor: "divider",
+                                            bgcolor: "#ffffff"
+                                        }}
+                                    >
+                                        <Typography variant="body2" sx={{ opacity: 0.75, mb: 0.5 }}>
+                                            Comment
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                                            {ratingData?.userRatingComment || "No comment provided."}
+                                        </Typography>
+                                    </Box>
 
-                                <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                                    Created at: {safeDate(ratingData?.createdAt)}
-                                </Typography>
+                                    <Box
+                                        sx={{
+                                            p: 1.5,
+                                            border: "1px solid",
+                                            borderColor: "divider",
+                                            bgcolor: "#f8fafc"
+                                        }}
+                                    >
+                                        <Typography variant="body2" sx={{ opacity: 0.75, mb: 0.75 }}>
+                                            System rating
+                                        </Typography>
+                                        <Typography sx={{ fontWeight: 800, mb: 0.5 }}>
+                                            {ratingData?.systemRating ?? "—"}/5
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ opacity: 0.8, whiteSpace: "pre-wrap" }}>
+                                            {ratingData?.systemRatingReason || "No system rating explanation available."}
+                                        </Typography>
+                                    </Box>
 
-                                <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                                    Updated at: {safeDate(ratingData?.updatedAt)}
-                                </Typography>
-                            </Stack>
+                                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                                        <Box sx={{ flex: 1, p: 1.25, border: "1px solid", borderColor: "divider", bgcolor: "#fafafa" }}>
+                                            <Typography variant="caption" sx={{ display: "block", opacity: 0.7 }}>
+                                                Created
+                                            </Typography>
+                                            <Typography variant="body2">{safeDate(ratingData?.createdAt)}</Typography>
+                                        </Box>
+                                        <Box sx={{ flex: 1, p: 1.25, border: "1px solid", borderColor: "divider", bgcolor: "#fafafa" }}>
+                                            <Typography variant="caption" sx={{ display: "block", opacity: 0.7 }}>
+                                                Updated
+                                            </Typography>
+                                            <Typography variant="body2">{safeDate(ratingData?.updatedAt)}</Typography>
+                                        </Box>
+                                    </Stack>
+                                </Stack>
+                            </Box>
                         </Paper>
                     ) : canRate ? (
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-                            <Stack spacing={1.5}>
-                                <Typography sx={{ fontWeight: 800 }}>
-                                    Leave a rating for the service provider
+                        <Paper variant="outlined" sx={{ p: 0, borderRadius: 2.5, overflow: "hidden" }}>
+                            <Box sx={{ px: 2, py: 1.5, bgcolor: "#f8fafc", borderBottom: "1px solid", borderColor: "divider" }}>
+                                <Typography sx={{ fontWeight: 900 }}>
+                                    Leave your rating
                                 </Typography>
+                                <Typography variant="body2" sx={{ opacity: 0.75 }}>
+                                    Share a short evaluation of the provider after the completed contract.
+                                </Typography>
+                            </Box>
 
-                                <Box>
-                                    <Typography variant="body2" sx={{ mb: 0.5, opacity: 0.85 }}>
-                                        Your rating
-                                    </Typography>
-                                    <Rating
-                                        value={ratingValue}
-                                        onChange={(_, newValue) => setRatingValue(newValue ?? 0)}
-                                    />
-                                </Box>
-
-                                <TextField
-                                    label="Comment"
-                                    fullWidth
-                                    multiline
-                                    minRows={3}
-                                    value={ratingComment}
-                                    onChange={(e) => setRatingComment(e.target.value)}
-                                    disabled={ratingBusy}
-                                />
-
-                                <Stack direction="row" justifyContent="flex-end">
-                                    <Button
-                                        variant="contained"
-                                        onClick={onSubmitRating}
-                                        disabled={ratingBusy || !ratingValue}
-                                        sx={{ fontWeight: 800 }}
+                            <Box sx={{ p: 2 }}>
+                                <Stack spacing={1.5}>
+                                    <Box
+                                        sx={{
+                                            p: 1.5,
+                                            border: "1px solid",
+                                            borderColor: "divider",
+                                            bgcolor: "#fcfffe"
+                                        }}
                                     >
-                                        {ratingBusy ? "Submitting..." : "Submit rating"}
-                                    </Button>
+                                        <Typography variant="body2" sx={{ mb: 0.75, opacity: 0.8 }}>
+                                            Your rating
+                                        </Typography>
+                                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "flex-start", sm: "center" }}>
+                                            <Rating
+                                                value={ratingValue}
+                                                onChange={(_, newValue) => setRatingValue(newValue ?? 0)}
+                                            />
+                                            <Typography sx={{ fontWeight: 800 }}>
+                                                {ratingValue ? `${ratingValue}/5 selected` : "Select a rating"}
+                                            </Typography>
+                                        </Stack>
+                                    </Box>
+
+                                    <TextField
+                                        label="Comment"
+                                        fullWidth
+                                        multiline
+                                        minRows={4}
+                                        value={ratingComment}
+                                        onChange={(e) => setRatingComment(e.target.value)}
+                                        disabled={ratingBusy}
+                                        helperText="Optional, but useful if you want to explain the result."
+                                    />
+
+                                    <Stack direction="row" justifyContent="flex-end">
+                                        <Button
+                                            variant="contained"
+                                            onClick={onSubmitRating}
+                                            disabled={ratingBusy || !ratingValue}
+                                            sx={{ fontWeight: 800, minWidth: 160 }}
+                                        >
+                                            {ratingBusy ? "Submitting..." : "Submit rating"}
+                                        </Button>
+                                    </Stack>
                                 </Stack>
-                            </Stack>
+                            </Box>
                         </Paper>
                     ) : (
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-                            <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                                Rating can be submitted only by the client after the contract is completed.
-                            </Typography>
+                        <Paper variant="outlined" sx={{ p: 0, borderRadius: 2.5, overflow: "hidden" }}>
+                            <Box sx={{ px: 2, py: 1.5, bgcolor: "#f8fafc", borderBottom: "1px solid", borderColor: "divider" }}>
+                                <Typography sx={{ fontWeight: 900 }}>
+                                    Rating unavailable
+                                </Typography>
+                                <Typography variant="body2" sx={{ opacity: 0.75 }}>
+                                    The client can submit a rating after the contract reaches completed status.
+                                </Typography>
+                            </Box>
 
-                            {ratingData && (
-                                <Box sx={{ mt: 1.5 }}>
-                                    <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                        System rating: {ratingData?.systemRating ?? "—"}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ opacity: 0.75, whiteSpace: "pre-wrap" }}>
-                                        System rating reason: {ratingData?.systemRatingReason || "—"}
+                            {ratingData ? (
+                                <Box sx={{ p: 2 }}>
+                                    <Box
+                                        sx={{
+                                            p: 1.5,
+                                            border: "1px solid",
+                                            borderColor: "divider",
+                                            bgcolor: "#fafafa"
+                                        }}
+                                    >
+                                        <Typography variant="body2" sx={{ opacity: 0.75, mb: 0.5 }}>
+                                            System rating
+                                        </Typography>
+                                        <Typography sx={{ fontWeight: 800, mb: 0.5 }}>
+                                            {ratingData?.systemRating ?? "—"}/5
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ opacity: 0.8, whiteSpace: "pre-wrap" }}>
+                                            {ratingData?.systemRatingReason || "No system rating explanation available."}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            ) : (
+                                <Box sx={{ p: 2 }}>
+                                    <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                                        No rating data available yet.
                                     </Typography>
                                 </Box>
                             )}

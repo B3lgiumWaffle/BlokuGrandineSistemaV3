@@ -126,7 +126,7 @@ public class MessagesController : ControllerBase
             return Forbid();
 
         if (!CanSendMessages(contract.status))
-            return BadRequest("Messages can only be sent when contract is Funded or InProgress.");
+            return BadRequest("Messages are disabled because the contract is already completed.");
 
         var receiverUserId = contract.fkClientUserId == userId.Value
             ? contract.fkProviderUserId
@@ -189,7 +189,7 @@ public class MessagesController : ControllerBase
             IsRead = message.isRead,
             ReadAt = message.readAt,
             SenderName = senderName,
-            ReceiverName = null // gali pasidaryti jei reikia
+            ReceiverName = "" // gali pasidaryti jei reikia
         });
     }
 
@@ -229,7 +229,7 @@ public class MessagesController : ControllerBase
 
     private static bool CanSendMessages(string? contractStatus)
     {
-        return contractStatus == "Funded" || contractStatus == "InProgress";
+        return !string.Equals(contractStatus, "Completed", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildUserName(b_user? user)

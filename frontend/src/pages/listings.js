@@ -75,9 +75,9 @@ function normalizePhotos(rawPhotos) {
 
 function moneyRangeText(priceFrom, priceTo) {
     if (priceFrom != null && priceTo != null) return `€${priceFrom} – €${priceTo}`;
-    if (priceFrom != null) return `Nuo €${priceFrom}`;
-    if (priceTo != null) return `Iki €${priceTo}`;
-    return "Nenurodyta";
+    if (priceFrom != null) return `From €${priceFrom}`;
+    if (priceTo != null) return `Up to €${priceTo}`;
+    return "Not specified";
 }
 
 function formatDate(value) {
@@ -177,7 +177,7 @@ function InquiryModal({
                                 }}
                             />
                             <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                                (Vėliau čia bus ETH)
+                                (Later this can be shown in ETH)
                             </Typography>
                         </Grid>
 

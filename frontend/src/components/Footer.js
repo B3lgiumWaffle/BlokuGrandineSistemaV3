@@ -1,98 +1,46 @@
-﻿import { Box, Container, Divider, Stack, Typography, Link as MuiLink } from "@mui/material";
+import { Box, Container, Divider, Grid, Stack, Typography, Link as MuiLink } from "@mui/material";
 import { Link } from "react-router-dom";
 
 export default function Footer() {
     const year = new Date().getFullYear();
 
     return (
-        <Box
-            component="footer"
-            sx={{
-                mt: "auto",
-                backgroundColor: "#111827",
-                color: "#f9fafb",
-                pt: 5,
-                pb: 2,
-            }}
-        >
-            <Container maxWidth="lg">
-                <Stack
-                    direction={{ xs: "column", md: "row" }}
-                    spacing={4}
-                    justifyContent="space-between"
-                    alignItems={{ xs: "flex-start", md: "flex-start" }}
-                >
-                    <Box sx={{ maxWidth: 320 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
-                            Blockchain Service Platform
+        <Box component="footer" sx={{ mt: "auto", bgcolor: "#0f172a", color: "#e2e8f0", pt: 6, pb: 3 }}>
+            <Container maxWidth="xl">
+                <Grid container spacing={4}>
+                    <Grid item xs={12} md={5}>
+                        <Typography variant="h6" sx={{ color: "white", mb: 1.5 }}>Blockchain Service Platform</Typography>
+                        <Typography sx={{ maxWidth: 460, lineHeight: 1.8, color: "rgba(226,232,240,0.76)" }}>
+                            A freelance collaboration system built around listings, inquiries, milestone-based contracts,
+                            smart contract payments, and transparent service delivery.
                         </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.8, lineHeight: 1.8 }}>
-                            A platform for clients and service providers to securely create contracts,
-                            manage milestones, leave feedback, and handle payments using blockchain technology.
-                        </Typography>
-                    </Box>
+                    </Grid>
 
-                    <Box>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.2 }}>
-                            Navigation
-                        </Typography>
-
-                        <Stack spacing={0.8}>
-                            <MuiLink component={Link} to="/" underline="hover" color="inherit" sx={{ opacity: 0.85 }}>
-                                Home
-                            </MuiLink>
-                            <MuiLink component={Link} to="/work" underline="hover" color="inherit" sx={{ opacity: 0.85 }}>
-                                Listings
-                            </MuiLink>
-                            <MuiLink component={Link} to="/my-contracts" underline="hover" color="inherit" sx={{ opacity: 0.85 }}>
-                                My Contracts
-                            </MuiLink>
-                            <MuiLink
-                                component={Link}
-                                to="/my-completed-contracts-comments"
-                                underline="hover"
-                                color="inherit"
-                                sx={{ opacity: 0.85 }}
-                            >
-                                Comments
-                            </MuiLink>
+                    <Grid item xs={12} sm={6} md={3}>
+                        <Typography sx={{ color: "white", fontWeight: 800, mb: 1.3 }}>Navigation</Typography>
+                        <Stack spacing={1}>
+                            <MuiLink component={Link} to="/" underline="hover" color="inherit">Home</MuiLink>
+                            <MuiLink component={Link} to="/work" underline="hover" color="inherit">Marketplace</MuiLink>
+                            <MuiLink component={Link} to="/my-contracts" underline="hover" color="inherit">Contracts</MuiLink>
+                            <MuiLink component={Link} to="/about" underline="hover" color="inherit">About</MuiLink>
                         </Stack>
-                    </Box>
+                    </Grid>
 
-                    <Box>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.2 }}>
-                            Contact
-                        </Typography>
-
-                        <Stack spacing={0.8}>
-                            <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                Email: jokjak@ktu.lt
-                            </Typography>
-                            <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                Phone: +370 600 00000
-                            </Typography>
-                            <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                Kaunas, Lithuania
-                            </Typography>
+                    <Grid item xs={12} sm={6} md={4}>
+                        <Typography sx={{ color: "white", fontWeight: 800, mb: 1.3 }}>Project</Typography>
+                        <Stack spacing={1}>
+                            <Typography sx={{ color: "rgba(226,232,240,0.76)" }}>Bachelor thesis project</Typography>
+                            <Typography sx={{ color: "rgba(226,232,240,0.76)" }}>Kaunas, Lithuania</Typography>
+                            <Typography sx={{ color: "rgba(226,232,240,0.76)" }}>Secure service agreements with blockchain support</Typography>
                         </Stack>
-                    </Box>
-                </Stack>
+                    </Grid>
+                </Grid>
 
-                <Divider sx={{ my: 3, borderColor: "rgba(255,255,255,0.12)" }} />
+                <Divider sx={{ my: 3, borderColor: "rgba(255,255,255,0.10)" }} />
 
-                <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    spacing={1}
-                    justifyContent="space-between"
-                    alignItems={{ xs: "flex-start", sm: "center" }}
-                >
-                    <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                        © {year} Blockchain Service Platform. All rights reserved.
-                    </Typography>
-
-                    <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                        Bachelor's Thesis Project
-                    </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between">
+                    <Typography sx={{ color: "rgba(226,232,240,0.60)" }}>© {year} Blockchain Service Platform</Typography>
+                    <Typography sx={{ color: "rgba(226,232,240,0.60)" }}>Professional freelance workflow demo</Typography>
                 </Stack>
             </Container>
         </Box>

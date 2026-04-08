@@ -3,7 +3,6 @@ import {
     Avatar,
     Box,
     Button,
-    Container,
     Divider,
     Grid,
     List,
@@ -19,6 +18,7 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import PersonIcon from "@mui/icons-material/Person";
 import LockIcon from "@mui/icons-material/Lock";
 import { useNavigate } from "react-router-dom";
+import { PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
 export default function EditProfile() {
     const navigate = useNavigate();
@@ -160,7 +160,7 @@ export default function EditProfile() {
 
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Klaida: ${res.status} ${txt}`);
+                alert(`Error: ${res.status} ${txt}`);
                 return;
             }
 
@@ -212,7 +212,7 @@ export default function EditProfile() {
 
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Klaida: ${res.status} ${txt}`);
+                alert(`Error: ${res.status} ${txt}`);
                 return;
             }
 
@@ -229,8 +229,18 @@ export default function EditProfile() {
     };
 
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
-            <Paper sx={{ p: 3 }}>
+        <PageShell
+            maxWidth="xl"
+            compact
+            hero={
+                <PageHero
+                    eyebrow="Profile"
+                    title="Manage your account settings."
+                    subtitle="Update your public details, wallet information, avatar, and password from one account workspace."
+                />
+            }
+        >
+            <SectionCard>
                 <Grid container spacing={3}>
                     <Grid item xs={12} md={4} lg={3}>
                         <Stack spacing={2} alignItems="center">
@@ -379,7 +389,7 @@ export default function EditProfile() {
                         )}
                     </Grid>
                 </Grid>
-            </Paper>
-        </Container>
+            </SectionCard>
+        </PageShell>
     );
 }

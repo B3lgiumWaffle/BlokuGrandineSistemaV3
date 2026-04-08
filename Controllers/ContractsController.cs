@@ -375,6 +375,12 @@ public class ContractsController : ControllerBase
         if (contract.status == "Completed" || contract.status == "Closed")
             return BadRequest("Contract is already finished.");
 
+        if (!contract.chainProjectId.HasValue)
+            return BadRequest("On-chain project must be created before submitting fragments.");
+
+        if (!contract.fundedAmountEth.HasValue || string.Equals(contract.status, "PendingFunding", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Contract must be funded before submitting fragments.");
+
         var milestone = await _db.b_contract_milestones
             .FirstOrDefaultAsync(m => m.fkContractId == contractId && m.milestoneNo == milestoneNo, ct);
 
@@ -384,6 +390,15 @@ public class ContractsController : ControllerBase
         if (string.Equals(milestone.status, "Released", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(milestone.status, "ReleasedPartial", StringComparison.OrdinalIgnoreCase))
             return BadRequest("Milestone is already settled.");
+
+        var hasPendingFragment = await _db.b_completed_listing_fragments
+            .AnyAsync(f =>
+                f.fkContractId == contractId &&
+                f.fkMilestoneId == milestone.milestoneId &&
+                f.status == "Submitted", ct);
+
+        if (hasPendingFragment)
+            return BadRequest("This milestone already has a submitted fragment waiting for approval.");
 
         string? fileUrl = null;
 
@@ -478,6 +493,7 @@ public class ContractsController : ControllerBase
             .FirstAsync(c => c.contractId == contractId, ct);
 
         var milestones = await _db.b_contract_milestones
+            .Include(m => m.fkRequirement)
             .AsNoTracking()
             .Where(m => m.fkContractId == contractId)
             .OrderBy(m => m.milestoneNo)
@@ -524,6 +540,7 @@ public class ContractsController : ControllerBase
                 MilestoneId = m.milestoneId,
                 MilestoneNo = m.milestoneNo,
                 RequirementId = m.fkRequirementId,
+                RequirementDescription = m.fkRequirement?.description ?? "",
                 AmountEurSnapshot = m.amountEurSnapshot,
                 AmountEth = m.amountEth,
                 Status = m.status,

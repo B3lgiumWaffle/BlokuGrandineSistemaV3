@@ -68,7 +68,7 @@ export default function UserProfileMonitoringDetails() {
 
     async function handleDeleteUser() {
         const ok = window.confirm(
-            "Ar tikrai nori ištrinti šį naudotoją? Bus ištrinti susiję duomenys."
+            "Are you sure you want to delete this user? Related data will also be removed."
         );
         if (!ok) return;
 
@@ -88,7 +88,7 @@ export default function UserProfileMonitoringDetails() {
                 throw new Error(`${res.status} ${txt}`);
             }
 
-            navigate("/user-profile-monitoring");
+            navigate("/admin/users");
         } catch (e) {
             setErr(e?.message ?? "Failed to delete user");
         } finally {

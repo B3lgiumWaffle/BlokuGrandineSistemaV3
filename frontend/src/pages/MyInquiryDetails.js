@@ -128,6 +128,7 @@ export default function MyInquiryDetails() {
 
     // Owner gali accept tik jei paskutinis modifikavo ne OWNER ir dar nėra confirmed
     const canAccept = item?.lastModifiedBy !== "OWNER" && !item?.isConfirmed;
+    const canModifyOrDecline = !item?.isConfirmed;
 
     const load = async (aliveRef = { alive: true }) => {
         try {
@@ -417,10 +418,10 @@ export default function MyInquiryDetails() {
                             <Divider sx={{ my: 2.2 }} />
 
                             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} justifyContent="flex-end">
-                                <Button variant="outlined" onClick={onModify} sx={{ fontWeight: 800 }}>
+                                <Button variant="outlined" onClick={onModify} disabled={!canModifyOrDecline} sx={{ fontWeight: 800 }}>
                                     Modify
                                 </Button>
-                                <Button variant="contained" color="error" onClick={onDecline} sx={{ fontWeight: 800 }}>
+                                <Button variant="contained" color="error" onClick={onDecline} disabled={!canModifyOrDecline} sx={{ fontWeight: 800 }}>
                                     Decline
                                 </Button>
                                 <Button
@@ -433,6 +434,12 @@ export default function MyInquiryDetails() {
                                     Accept
                                 </Button>
                             </Stack>
+
+                            {!canModifyOrDecline && (
+                                <Typography variant="body2" sx={{ mt: 1.2, opacity: 0.7, textAlign: "right" }}>
+                                    Accepted inquiries can no longer be modified or declined.
+                                </Typography>
+                            )}
                         </>
                     ) : (
                         <>

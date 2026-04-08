@@ -1,16 +1,5 @@
-﻿import {
-    AppBar,
-    Toolbar,
-    Button,
-    Typography,
-    Box,
-    Paper,
-    Menu,
-    MenuItem,
-    Divider,
-    Badge,
-    IconButton,
-    ListItemText
+import {
+    AppBar, Toolbar, Button, Typography, Box, Menu, MenuItem, Divider, Badge, IconButton, ListItemText, Stack, Chip
 } from "@mui/material";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -21,144 +10,44 @@ const API_URL = "https://localhost:7278";
 export default function Navbar({ user, onLogout }) {
     const location = useLocation();
     const navigate = useNavigate();
-    const currentPath = location.pathname;
-
     const [anchorEl, setAnchorEl] = useState(null);
-    const menuOpen = Boolean(anchorEl);
-
     const [notifAnchorEl, setNotifAnchorEl] = useState(null);
-    const notifOpen = Boolean(notifAnchorEl);
-
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
+    const token = localStorage.getItem("token");
+    const menuOpen = Boolean(anchorEl);
+    const notifOpen = Boolean(notifAnchorEl);
 
-    const displayName = useMemo(() => {
-        return user?.username ?? "User";
-    }, [user]);
+    const displayName = useMemo(() => user?.username ?? "Account", [user]);
+    const currentPath = location.pathname;
 
-    function getUserRoleFromToken() {
-        const token = localStorage.getItem("token");
+    const userRole = (() => {
         if (!token) return null;
-
         try {
             const payload = JSON.parse(atob(token.split(".")[1]));
-
-            return (
-                payload.role ||
-                payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ||
-                null
-            );
+            return payload.role || payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || null;
         } catch {
             return null;
         }
-    }
-
-    const userRole = getUserRoleFromToken();
-    const token = localStorage.getItem("token");
-
-    const openMenu = (e) => setAnchorEl(e.currentTarget);
-    const closeMenu = () => setAnchorEl(null);
-
-    const openNotifMenu = async (e) => {
-        setNotifAnchorEl(e.currentTarget);
-        await loadNotifications();
-    };
-
-    const closeNotifMenu = () => setNotifAnchorEl(null);
-
-    const go = (path) => {
-        closeMenu();
-        navigate(path);
-    };
-
-    const handleLogout = () => {
-        closeMenu();
-        onLogout();
-        navigate("/");
-    };
+    })();
 
     const loadNotifications = async () => {
         if (!token) return;
-
         try {
             const [listRes, countRes] = await Promise.all([
-                fetch(`${API_URL}/api/notifications`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }),
-                fetch(`${API_URL}/api/notifications/unread-count`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                })
+                fetch(`${API_URL}/api/notifications`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_URL}/api/notifications/unread-count`, { headers: { Authorization: `Bearer ${token}` } })
             ]);
-
             if (listRes.ok) {
                 const listData = await listRes.json();
                 setNotifications(Array.isArray(listData) ? listData : []);
             }
-
             if (countRes.ok) {
                 const countData = await countRes.json();
                 setUnreadCount(countData?.count ?? 0);
             }
         } catch (e) {
             console.error("Failed to load notifications", e);
-        }
-    };
-
-    const markAsReadAndGo = async (n) => {
-        try {
-            if (token && !n.isRead) {
-                await fetch(`${API_URL}/api/notifications/${n.notificationId}/read`, {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                });
-            }
-
-            closeNotifMenu();
-            await loadNotifications();
-
-            if (n.type === "ListingRejected") {
-                navigate(`/my-listings/edit/${n.referenceId}`);
-                return;
-            }
-
-            if (n.type === "ListingApproved") {
-                navigate(`/my-listings`);
-                return;
-            }
-
-            if (n.type === "contract_message") {
-                navigate(`/contracts/${n.referenceId}`);
-                return;
-            }
-
-            navigate("/my-profile");
-        } catch (e) {
-            console.error(e);
-        }
-    };
-
-    const markAllAsRead = async () => {
-        try {
-            if (!token) return;
-
-            const res = await fetch(`${API_URL}/api/notifications/read-all`, {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-
-            if (res.ok) {
-                await loadNotifications();
-            }
-        } catch (e) {
-            console.error(e);
         }
     };
 
@@ -169,291 +58,160 @@ export default function Navbar({ user, onLogout }) {
             setNotifications([]);
             setUnreadCount(0);
         }
-    }, [user]);
+    }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const navButtonSx = {
-        color: "#f9fafb",
-        px: 1.5,
-        py: 0.8,
-        borderRadius: 2,
-        textTransform: "none",
-        fontWeight: 500,
-        minWidth: "auto",
+    const markAllAsRead = async () => {
+        if (!token) return;
+        try {
+            const res = await fetch(`${API_URL}/api/notifications/read-all`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) await loadNotifications();
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const markAsReadAndGo = async (n) => {
+        try {
+            if (token && !n.isRead) {
+                await fetch(`${API_URL}/api/notifications/${n.notificationId}/read`, {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            }
+            setNotifAnchorEl(null);
+            await loadNotifications();
+            if (n.type === "ListingRejected") return navigate(`/my-listings/edit/${n.referenceId}`);
+            if (n.type === "ListingApproved") return navigate("/my-listings");
+            if (n.type === "contract_message") return navigate(`/contracts/${n.referenceId}`);
+            navigate("/my-profile");
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const navItems = [
+        { to: "/", label: "Home" },
+        { to: "/work", label: "Marketplace" },
+        { to: "/my-contracts", label: "Contracts", auth: true },
+        { to: "/my-inquiries", label: "Incoming Inquiries", auth: true, roles: ["Admin", "Seller"] },
+        { to: "/my-mysentinquiries", label: "Sent Inquiries", auth: true },
+        { to: "/my-completed-contracts-comments", label: "Reviews", auth: true },
+        { to: "/about", label: "About" }
+    ].filter((item) => {
+        if (item.auth && !user) return false;
+        if (item.roles && !item.roles.includes(userRole)) return false;
+        return true;
+    });
+
+    const navButtonSx = (active) => ({
+        color: active ? "#052e2b" : "#e2e8f0",
+        px: 1.6,
+        py: 0.9,
+        borderRadius: 0,
+        fontWeight: 700,
+        bgcolor: active ? "#ccfbf1" : "transparent",
         "&:hover": {
-            backgroundColor: "rgba(255,255,255,0.08)",
-        },
-    };
-
-    const activeNavButtonSx = {
-        ...navButtonSx,
-        backgroundColor: "rgba(255,255,255,0.12)",
-        border: "1px solid rgba(255,255,255,0.16)",
-        "&:hover": {
-            backgroundColor: "rgba(255,255,255,0.16)",
-        },
-    };
-
-    const menuPaperSx = {
-        mt: 1,
-        borderRadius: 2.5,
-        minWidth: 220,
-        backgroundColor: "#1f2937",
-        color: "#f9fafb",
-        border: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-        "& .MuiMenuItem-root": {
-            fontSize: 14,
-            borderRadius: 1.5,
-            mx: 0.5,
-            my: 0.25,
-        },
-        "& .MuiMenuItem-root:hover": {
-            backgroundColor: "rgba(255,255,255,0.08)",
-        },
-    };
+            bgcolor: active ? "#ccfbf1" : "rgba(255,255,255,0.08)"
+        }
+    });
 
     return (
-        <AppBar
-            position="static"
-            elevation={0}
-            sx={{
-                backgroundColor: "#111827",
-                color: "#f9fafb",
-                borderBottom: "1px solid rgba(255,255,255,0.08)",
-            }}
-        >
-            <Toolbar sx={{ minHeight: 72, gap: 2 }}>
-                <Typography
-                    variant="h6"
-                    sx={{
-                        mr: 1,
-                        fontWeight: 800,
-                        whiteSpace: "nowrap",
-                        color: "#f9fafb",
-                    }}
-                >
-                    Blockchain Service Platform
-                </Typography>
+        <AppBar position="sticky" elevation={0} sx={{ background: "rgba(15, 23, 42, 0.86)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <Toolbar sx={{ minHeight: 78, gap: 2 }}>
+                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mr: 1 }}>
+                    <Box sx={{ width: 42, height: 42, borderRadius: 0, display: "grid", placeItems: "center", bgcolor: "#14b8a6", color: "#042f2e", fontWeight: 900 }}>
+                        BS
+                    </Box>
+                    <Box>
+                        <Typography sx={{ color: "white", fontWeight: 900, lineHeight: 1.1 }}>Blockchain Service Platform</Typography>
+                        <Typography sx={{ color: "rgba(255,255,255,0.64)", fontSize: 12 }}>Secure freelance workflow system</Typography>
+                    </Box>
+                </Stack>
 
-                <Box
-                    sx={{
-                        display: "flex",
-                        gap: 0.75,
-                        flexWrap: "wrap",
-                        alignItems: "center",
-                    }}
-                >
-                    <Button
-                        component={Link}
-                        to="/"
-                        variant="text"
-                        sx={currentPath === "/" ? activeNavButtonSx : navButtonSx}
-                    >
-                        Home
-                    </Button>
-
-                    <Button
-                        component={Link}
-                        to="/work"
-                        variant="text"
-                        sx={currentPath === "/work" ? activeNavButtonSx : navButtonSx}
-                    >
-                        Work
-                    </Button>
-
-                    <Button
-                        component={Link}
-                        to="/my-contracts"
-                        variant="text"
-                        sx={currentPath === "/my-contracts" ? activeNavButtonSx : navButtonSx}
-                    >
-                        My Contracts
-                    </Button>
-
-                    {(userRole === "Admin" || userRole === "Seller") && (
-                        <Button
-                            component={Link}
-                            to="/my-inquiries"
-                            variant="text"
-                            sx={currentPath === "/my-inquiries" ? activeNavButtonSx : navButtonSx}
-                        >
-                            My Inquiries
+                <Box sx={{ display: { xs: "none", md: "flex" }, gap: 0.75, flexWrap: "wrap", alignItems: "center" }}>
+                    {navItems.map((item) => (
+                        <Button key={item.to} component={Link} to={item.to} sx={navButtonSx(currentPath === item.to)}>
+                            {item.label}
                         </Button>
-                    )}
-
-                    <Button
-                        component={Link}
-                        to="/my-mysentinquiries"
-                        variant="text"
-                        sx={currentPath === "/my-mysentinquiries" ? activeNavButtonSx : navButtonSx}
-                    >
-                        My Sent Inquiries
-                    </Button>
-
-                    <Button
-                        component={Link}
-                        to="/my-completed-contracts-comments"
-                        variant="text"
-                        sx={currentPath === "/my-completed-contracts-comments" ? activeNavButtonSx : navButtonSx}
-                    >
-                        My Comments
-                    </Button>
-
-                    <Button
-                        component={Link}
-                        to="/about"
-                        variant="text"
-                        sx={currentPath === "/about" ? activeNavButtonSx : navButtonSx}
-                    >
-                        About
-                    </Button>
+                    ))}
                 </Box>
 
                 <Box sx={{ flexGrow: 1 }} />
 
                 {!user ? (
-                    <Button
-                        component={Link}
-                        to="/login"
-                        variant="text"
-                        sx={currentPath === "/login" ? activeNavButtonSx : navButtonSx}
-                    >
-                        Login
-                    </Button>
+                    <Stack direction="row" spacing={1}>
+                        <Button component={Link} to="/register" variant="text" sx={{ color: "#e2e8f0" }}>Register</Button>
+                        <Button component={Link} to="/login" variant="contained" sx={{ borderRadius: 0, bgcolor: "#14b8a6", color: "#042f2e", "&:hover": { bgcolor: "#2dd4bf" } }}>
+                            Sign in
+                        </Button>
+                    </Stack>
                 ) : (
-                    <>
-                        <IconButton
-                            onClick={openNotifMenu}
-                            sx={{
-                                color: "#f9fafb",
-                                borderRadius: 2,
-                                "&:hover": {
-                                    backgroundColor: "rgba(255,255,255,0.08)",
-                                },
-                            }}
-                        >
+                    <Stack direction="row" spacing={1.2} alignItems="center">
+                        <IconButton onClick={async (e) => { setNotifAnchorEl(e.currentTarget); await loadNotifications(); }} sx={{ color: "white" }}>
                             <Badge badgeContent={unreadCount} color="error">
                                 <NotificationsIcon />
                             </Badge>
                         </IconButton>
 
-                        <Paper
-                            onClick={openMenu}
-                            role="button"
-                            tabIndex={0}
-                            elevation={0}
-                            sx={{
-                                cursor: "pointer",
-                                px: 1.5,
-                                py: 0.9,
-                                borderRadius: 2,
-                                bgcolor: "rgba(255,255,255,0.10)",
-                                border: "1px solid rgba(255,255,255,0.10)",
-                                color: "#f9fafb",
-                                userSelect: "none",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                                transition: "0.15s",
-                                "&:hover": {
-                                    bgcolor: "rgba(255,255,255,0.14)",
-                                },
-                            }}
-                        >
-                            <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                Welcome,
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                                {displayName}
-                            </Typography>
-                        </Paper>
+                        <Button onClick={(e) => setAnchorEl(e.currentTarget)} variant="outlined" sx={{ borderRadius: 0, color: "white", borderColor: "rgba(255,255,255,0.18)", px: 1.7 }}>
+                            {displayName}
+                        </Button>
 
                         <Menu
                             anchorEl={anchorEl}
                             open={menuOpen}
-                            onClose={closeMenu}
+                            onClose={() => setAnchorEl(null)}
                             anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                             transformOrigin={{ vertical: "top", horizontal: "right" }}
-                            PaperProps={{ sx: menuPaperSx }}
+                            PaperProps={{ sx: { mt: 1, minWidth: 250, borderRadius: 0, border: "1px solid rgba(15,23,42,0.08)" } }}
                         >
-                            <MenuItem onClick={() => go("/my-profile")}>My Profile</MenuItem>
-
-                            {(userRole === "Admin" || userRole === "Seller") && (
-                                <MenuItem onClick={() => go("/my-listings")}>My Listings</MenuItem>
-                            )}
-
-                            {userRole === "Admin" && <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />}
-
-                            {userRole === "Admin" && (
-                                <MenuItem onClick={() => go("/admin/listings")}>
-                                    Listing Monitoring
-                                </MenuItem>
-                            )}
-
-                            {userRole === "Admin" && (
-                                <MenuItem onClick={() => go("/admin/users")}>
-                                    User Profile Monitoring
-                                </MenuItem>
-                            )}
-
-                            <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
-                            <MenuItem onClick={handleLogout}>Logout</MenuItem>
+                            <Box sx={{ px: 2, py: 1.5 }}>
+                                <Typography sx={{ fontWeight: 800 }}>{displayName}</Typography>
+                                <Typography sx={{ fontSize: 13, color: "text.secondary" }}>{userRole || "User account"}</Typography>
+                            </Box>
+                            <Divider />
+                            <MenuItem onClick={() => { setAnchorEl(null); navigate("/my-profile"); }}>My profile</MenuItem>
+                            {(userRole === "Admin" || userRole === "Seller") ? <MenuItem onClick={() => { setAnchorEl(null); navigate("/my-listings"); }}>My listings</MenuItem> : null}
+                            {userRole === "Admin" ? <MenuItem onClick={() => { setAnchorEl(null); navigate("/admin/listings"); }}>Admin listings</MenuItem> : null}
+                            {userRole === "Admin" ? <MenuItem onClick={() => { setAnchorEl(null); navigate("/admin/users"); }}>Admin users</MenuItem> : null}
+                            <Divider />
+                            <MenuItem onClick={() => { setAnchorEl(null); onLogout(); navigate("/"); }}>Sign out</MenuItem>
                         </Menu>
 
                         <Menu
                             anchorEl={notifAnchorEl}
                             open={notifOpen}
-                            onClose={closeNotifMenu}
+                            onClose={() => setNotifAnchorEl(null)}
                             anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                             transformOrigin={{ vertical: "top", horizontal: "right" }}
-                            PaperProps={{
-                                sx: {
-                                    ...menuPaperSx,
-                                    minWidth: 320,
-                                    maxWidth: 380,
-                                }
-                            }}
+                            PaperProps={{ sx: { mt: 1, width: 360, maxWidth: "calc(100vw - 24px)", borderRadius: 0, border: "1px solid rgba(15,23,42,0.08)" } }}
                         >
-                            <MenuItem disabled sx={{ opacity: 1 }}>
-                                <Typography sx={{ fontWeight: 700, color: "#f9fafb" }}>
-                                    Notifications
-                                </Typography>
-                            </MenuItem>
-
+                            <Box sx={{ px: 2, py: 1.5 }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                    <Typography sx={{ fontWeight: 900 }}>Notifications</Typography>
+                                    <Chip label={`${unreadCount} unread`} size="small" />
+                                </Stack>
+                            </Box>
+                            <Divider />
                             <MenuItem onClick={markAllAsRead}>Mark all as read</MenuItem>
-
-                            <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
-
+                            <Divider />
                             {notifications.length === 0 ? (
-                                <MenuItem disabled>No notifications</MenuItem>
-                            ) : (
-                                notifications.slice(0, 8).map((n) => (
-                                    <MenuItem
-                                        key={n.notificationId}
-                                        onClick={() => markAsReadAndGo(n)}
-                                        sx={{
-                                            alignItems: "flex-start",
-                                            py: 1.2,
-                                        }}
-                                    >
-                                        <ListItemText
-                                            primary={n.title}
-                                            secondary={n.message || ""}
-                                            primaryTypographyProps={{
-                                                fontWeight: n.isRead ? 500 : 700,
-                                                color: "#f9fafb",
-                                                fontSize: 14,
-                                            }}
-                                            secondaryTypographyProps={{
-                                                color: "rgba(249,250,251,0.72)",
-                                                fontSize: 13,
-                                            }}
-                                        />
-                                    </MenuItem>
-                                ))
-                            )}
+                                <MenuItem disabled>No notifications yet</MenuItem>
+                            ) : notifications.slice(0, 8).map((n) => (
+                                <MenuItem key={n.notificationId} onClick={() => markAsReadAndGo(n)} sx={{ alignItems: "flex-start", py: 1.2 }}>
+                                    <ListItemText
+                                        primary={n.title}
+                                        secondary={n.message || ""}
+                                        primaryTypographyProps={{ fontWeight: n.isRead ? 600 : 800, fontSize: 14 }}
+                                        secondaryTypographyProps={{ fontSize: 13 }}
+                                    />
+                                </MenuItem>
+                            ))}
                         </Menu>
-                    </>
+                    </Stack>
                 )}
             </Toolbar>
         </AppBar>

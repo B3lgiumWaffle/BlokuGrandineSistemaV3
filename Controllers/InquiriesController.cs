@@ -286,6 +286,7 @@ namespace BlokuGrandiniuSistema.Controllers;
 
         if (ownerId == null) return NotFound("Listing not found.");
         if (ownerId != userId.Value) return Forbid();
+        if (inquiry.isConfirmed) return BadRequest("Inquiry is already accepted.");
 
         await ApplyUpdate(inquiry, dto, modifiedBy: "OWNER", ct);
             return NoContent();
@@ -405,6 +406,7 @@ namespace BlokuGrandiniuSistema.Controllers;
             var isSender = inquiry.fk_userId == userId.Value;
 
             if (!isOwner && !isSender) return Forbid();
+            if (inquiry.isConfirmed) return BadRequest("Accepted inquiries cannot be deleted.");
 
             _db.b_inquiries.Remove(inquiry);
             await _db.SaveChangesAsync(ct); // requirements deleted via ON DELETE CASCADE
@@ -1008,38 +1010,4 @@ namespace BlokuGrandiniuSistema.Controllers;
 
         return "Approved with partial payout because " + string.Join("; ", reasons) + ".";
     }
-
-    //private async Task EnsureRatingRowExists(int contractId, CancellationToken ct)
-    //{
-    //    var exists = await _db.b_ratings
-    //        .AnyAsync(r => r.fkContractId == contractId, ct);
-
-    //    if (exists) return;
-
-    //    var contract = await _db.b_contracts
-    //        .AsNoTracking()
-    //        .FirstOrDefaultAsync(c => c.contractId == contractId, ct);
-
-    //    if (contract == null) return;
-
-    //    var inquiry = await _db.b_inquiries
-    //        .AsNoTracking()
-    //        .FirstOrDefaultAsync(i => i.inquiryId == contract.fkInquiryId, ct);
-
-    //    if (inquiry == null) return;
-
-    //    _db.b_ratings.Add(new b_rating
-    //    {
-    //        fkContractId = contract.contractId,
-    //        fkListingId = inquiry.fk_listingId,
-    //        fkFromUserId = contract.fkClientUserId,
-    //        fkToUserId = contract.fkProviderUserId,
-    //        userRating = null,
-    //        userRatingComment = null,
-    //        systemRating = null,
-    //        systemRatingReason = null,
-    //        createdAt = DateTime.UtcNow,
-    //        updatedAt = DateTime.UtcNow
-    //    });
-    //}
 }

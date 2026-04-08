@@ -2,17 +2,16 @@
 import {
     Box,
     CircularProgress,
-    Container,
     Paper,
     Stack,
     Typography,
     Divider,
-    Button,
     TextField,
     Chip,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/api";
+import { BackButton, EmptyState, PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
 function normalizeContracts(raw) {
     const data = Array.isArray(raw) ? raw : raw?.items ?? raw?.data ?? [];
@@ -136,48 +135,50 @@ export default function MyContracts() {
     }, [items, q]);
 
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                    My Contracts
-                </Typography>
+        <PageShell
+            maxWidth="xl"
+            compact
+            hero={
+                <PageHero
+                    eyebrow="Contracts"
+                    title="Track active agreements and delivery flow."
+                    subtitle="Search your contract records, review statuses, and open full milestone detail pages."
+                    actions={[<BackButton key="back" onClick={() => navigate(-1)} />]}
+                    stats={[
+                        { label: "All contracts", value: items.length },
+                        { label: "Matching search", value: filtered.length }
+                    ]}
+                />
+            }
+        >
 
-                <Button variant="outlined" onClick={() => navigate(-1)}>
-                    Back
-                </Button>
-            </Stack>
-
-            <Paper sx={{ p: 2, borderRadius: 3, mb: 2 }}>
+            <SectionCard sx={{ mb: 2 }}>
                 <TextField
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     fullWidth
                     label="Search by contract ID, inquiry ID, listing, status, network, or amount"
                 />
-            </Paper>
+            </SectionCard>
 
             {loading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                     <CircularProgress />
                 </Box>
             ) : err ? (
-                <Paper sx={{ p: 2, borderRadius: 3 }}>
+                <SectionCard>
                     <Typography variant="body1" sx={{ fontWeight: 700, mb: 0.5 }}>
                         Error
                     </Typography>
                     <Typography variant="body2" sx={{ opacity: 0.8 }}>
                         {err}
                     </Typography>
-                </Paper>
+                </SectionCard>
             ) : filtered.length === 0 ? (
-                <Paper sx={{ p: 3, borderRadius: 3 }}>
-                    <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                        No contracts found
-                    </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>
-                        Accepted inquiries that become contracts will appear here.
-                    </Typography>
-                </Paper>
+                <EmptyState
+                    title="No contracts found"
+                    subtitle="Accepted inquiries that become contracts will appear here."
+                />
             ) : (
                 <Stack spacing={2}>
                     {filtered.map((x) => (
@@ -241,6 +242,6 @@ export default function MyContracts() {
                     ))}
                 </Stack>
             )}
-        </Container>
+        </PageShell>
     );
 }

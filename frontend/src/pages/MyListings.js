@@ -3,7 +3,6 @@ import {
     Box,
     Button,
     CircularProgress,
-    Container,
     Paper,
     Stack,
     Typography,
@@ -16,6 +15,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/api";
+import { BackButton, EmptyState, PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
 export default function MyListings() {
     const navigate = useNavigate();
@@ -92,41 +92,48 @@ export default function MyListings() {
 
 
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                    My Listings
-                </Typography>
-
-                <Button variant="contained" onClick={() => navigate("/my-listings/new")}>
-                    Add Listing
-                </Button>
-            </Stack>
+        <PageShell
+            maxWidth="xl"
+            compact
+            hero={
+                <PageHero
+                    eyebrow="Seller workspace"
+                    title="Manage your listings in one place."
+                    subtitle="Create, update, review, and remove your service offers with a cleaner administration view."
+                    actions={[
+                        <Button key="create" variant="contained" onClick={() => navigate("/my-listings/new")}>Create listing</Button>,
+                        <BackButton key="back" onClick={() => navigate(-1)} />
+                    ]}
+                    stats={[
+                        { label: "Listings", value: items.length },
+                        { label: "Visible table rows", value: items.length || 0 }
+                    ]}
+                />
+            }
+        >
 
             {loading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                     <CircularProgress />
                 </Box>
             ) : err ? (
-                <Paper sx={{ p: 2 }}>
+                <SectionCard>
                     <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>
                         Error
                     </Typography>
                     <Typography variant="body2" sx={{ opacity: 0.8 }}>
                         {err}
                     </Typography>
-                </Paper>
+                </SectionCard>
             ) : items.length === 0 ? (
-                <Paper sx={{ p: 3 }}>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        You dont have any listings
-                    </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>
-                        Press "Add listings" to add a new listing
-                    </Typography>
-                </Paper>
+                <EmptyState
+                    title="You do not have any listings yet"
+                    subtitle="Create your first listing to publish a service in the marketplace."
+                    action={<Button variant="contained" onClick={() => navigate("/my-listings/new")}>Create listing</Button>}
+                />
             ) : (
-                <TableContainer component={Paper}>
+                <SectionCard title="Your listings" subtitle="A compact overview of price, delivery, date, and primary image.">
+                <TableContainer component={Paper} elevation={0} sx={{ boxShadow: "none", border: "1px solid rgba(15,23,42,0.08)" }}>
                     <Table>
                                     <TableHead>
                                         <TableRow>
@@ -205,7 +212,8 @@ export default function MyListings() {
 
                     </Table>
                 </TableContainer>
+                </SectionCard>
             )}
-        </Container>
+        </PageShell>
     );
 }

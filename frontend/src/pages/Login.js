@@ -1,108 +1,73 @@
-﻿import { useState } from "react";
-import { Container, Typography, TextField, Button, Alert, Box } from "@mui/material";
+import { useState } from "react";
+import { Alert, Box, Button, Grid, Link as MuiLink, Stack, TextField, Typography } from "@mui/material";
 import { Link } from "react-router-dom";
-
+import { PageShell, SectionCard } from "../components/PageChrome";
 
 const API_URL = "https://localhost:7278";
 
 export default function Login({ onLogin }) {
-    const [form, setForm] = useState({
-        usernameOrEmail: "",
-        password: "",
-    });
-
+    const [form, setForm] = useState({ usernameOrEmail: "", password: "" });
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    const setField = (name) => (e) => {
-        setForm((p) => ({ ...p, [name]: e.target.value }));
-    };
-
-    const validate = () => {
-        if (!form.usernameOrEmail || !form.password) return "Please fill all fields";
-        if (form.password.length < 6) return "Password needs to be at least 6 characters";
-        return "";
-    };
+    const setField = (name) => (e) => setForm((p) => ({ ...p, [name]: e.target.value }));
 
     const onSubmit = async (e) => {
         e.preventDefault();
         setError("");
         setSuccess("");
-
-        const v = validate();
-        if (v) return setError(v);
+        if (!form.usernameOrEmail || !form.password) return setError("Please complete all fields.");
+        if (form.password.length < 6) return setError("Password must be at least 6 characters.");
 
         try {
             const res = await fetch(`${API_URL}/api/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    usernameOrEmail: form.usernameOrEmail,
-                    password: form.password,
-                }),
+                body: JSON.stringify(form)
             });
-
             const data = await res.json().catch(() => ({}));
-
-            if (!res.ok) {
-                setError(data.message || `Error: HTTP ${res.status}`);
-                return;
-            }
-
-            // ✅ išsisaugom user
+            if (!res.ok) return setError(data.message || `Error: HTTP ${res.status}`);
             localStorage.setItem("token", data.token);
             localStorage.setItem("user", JSON.stringify(data.user));
             onLogin(data.user);
-
-
-            //setSuccess(`Logged in: ${data.username} (${data.role})`);
-            setSuccess(`Logged in: ${data.user.username} (${data.user.role})`);
+            setSuccess(`Signed in as ${data.user.username} (${data.user.role}).`);
             setForm({ usernameOrEmail: "", password: "" });
         } catch {
-            setError("Could not connect to server (is backend working?)");
+            setError("Could not connect to the server.");
         }
     };
 
     return (
-        <Container maxWidth="sm" sx={{ mt: 4 }}>
-            <Typography variant="h4" gutterBottom>
-                Log-in
-            </Typography>
-
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-            {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
-
-            <Box component="form" onSubmit={onSubmit}>
-                <TextField
-                    fullWidth
-                    label="Email or Username"
-                    margin="normal"
-                    value={form.usernameOrEmail}
-                    onChange={setField("usernameOrEmail")}
-                />
-
-                <TextField
-                    fullWidth
-                    label="Password"
-                    type="password"
-                    margin="normal"
-                    value={form.password}
-                    onChange={setField("password")}
-                />
-
-                <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>
-                    Log-in
-                </Button>
-                <Box sx={{ mt: 2, textAlign: "center" }}>
-                    <Typography variant="body2">
-                        If you are not registered,{" "}
-                        <Link to="/register" style={{ textDecoration: "none", fontWeight: 600 }}>
-                            register here
-                        </Link>
-                    </Typography>
-                </Box>
-
-            </Box>
-        </Container>
+        <PageShell maxWidth="lg" compact>
+            <Grid container spacing={2.5} alignItems="stretch">
+                <Grid item xs={12} md={5}>
+                    <SectionCard sx={{ height: "100%", bgcolor: "#0f172a", color: "white" }}>
+                        <Stack spacing={2}>
+                            <Typography variant="h4" sx={{ color: "white" }}>Welcome back</Typography>
+                            <Typography sx={{ color: "rgba(255,255,255,0.78)", lineHeight: 1.8 }}>
+                                Sign in to manage listings, view inquiries, follow contracts, and keep your profile up to date.
+                            </Typography>
+                        </Stack>
+                    </SectionCard>
+                </Grid>
+                <Grid item xs={12} md={7}>
+                    <SectionCard title="Sign in" subtitle="Use your email or username to access your workspace.">
+                        {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
+                        {success ? <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert> : null}
+                        <Box component="form" onSubmit={onSubmit}>
+                            <TextField fullWidth label="Email or username" margin="normal" value={form.usernameOrEmail} onChange={setField("usernameOrEmail")} />
+                            <TextField fullWidth label="Password" type="password" margin="normal" value={form.password} onChange={setField("password")} />
+                            <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>Sign in</Button>
+                            <Typography variant="body2" sx={{ mt: 2, textAlign: "center", color: "text.secondary" }}>
+                                Need an account?{" "}
+                                <MuiLink component={Link} to="/register" underline="hover" sx={{ fontWeight: 700 }}>
+                                    Register here
+                                </MuiLink>
+                            </Typography>
+                        </Box>
+                    </SectionCard>
+                </Grid>
+            </Grid>
+        </PageShell>
     );
 }

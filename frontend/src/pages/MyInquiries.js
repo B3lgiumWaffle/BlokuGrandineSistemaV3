@@ -1,18 +1,18 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import {
     Box,
+    Button,
     CircularProgress,
-    Container,
     Paper,
     Stack,
     Typography,
     Divider,
-    Button,
     TextField,
     Chip,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/api";
+import { BackButton, EmptyState, PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
 /**
  * Expected API shapes supported:
@@ -100,6 +100,7 @@ export default function MyInquiries() {
     const [err, setErr] = useState("");
     const [groups, setGroups] = useState([]);
     const [q, setQ] = useState("");
+    const [expandedAccepted, setExpandedAccepted] = useState({});
 
     useEffect(() => {
         if (!token) {
@@ -155,75 +156,116 @@ export default function MyInquiries() {
             .filter(Boolean);
     }, [groups, q]);
 
+    const totalAccepted = useMemo(
+        () => groups.reduce((sum, g) => sum + g.inquiries.filter((x) => x.isConfirmed).length, 0),
+        [groups]
+    );
+
+    const totalOpen = useMemo(
+        () => groups.reduce((sum, g) => sum + g.inquiries.filter((x) => !x.isConfirmed).length, 0),
+        [groups]
+    );
+
+    const toggleAccepted = (listingId) => {
+        setExpandedAccepted((prev) => ({
+            ...prev,
+            [listingId]: !prev[listingId]
+        }));
+    };
+
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                    My Inquiries
-                </Typography>
+        <PageShell
+            maxWidth="xl"
+            compact
+            hero={
+                <PageHero
+                    eyebrow="Incoming inquiries"
+                    title="Review inquiries sent to your listings."
+                    subtitle="Group inquiries by listing, search faster, and open each negotiation thread from a cleaner inbox view."
+                    actions={[<BackButton key="back" onClick={() => navigate(-1)} />]}
+                    stats={[
+                        { label: "Listing groups", value: groups.length },
+                        { label: "Open inquiries", value: totalOpen },
+                        { label: "Accepted", value: totalAccepted }
+                    ]}
+                />
+            }
+        >
 
-                <Button variant="outlined" onClick={() => navigate(-1)}>
-                    Back
-                </Button>
-            </Stack>
-
-            <Paper sx={{ p: 2, borderRadius: 3, mb: 2 }}>
+            <SectionCard sx={{ mb: 2 }}>
                 <TextField
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     fullWidth
                     label="Search by listing, description, price, or ID"
                 />
-            </Paper>
+            </SectionCard>
 
             {loading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                     <CircularProgress />
                 </Box>
             ) : err ? (
-                <Paper sx={{ p: 2, borderRadius: 3 }}>
+                <SectionCard>
                     <Typography variant="body1" sx={{ fontWeight: 700, mb: 0.5 }}>
                         Error
                     </Typography>
                     <Typography variant="body2" sx={{ opacity: 0.8 }}>
                         {err}
                     </Typography>
-                </Paper>
+                </SectionCard>
             ) : filtered.length === 0 ? (
-                <Paper sx={{ p: 3, borderRadius: 3 }}>
-                    <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                        No inquiries found
-                    </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>
-                        When someone sends an inquiry to your listings, it will appear here.
-                    </Typography>
-                </Paper>
+                <EmptyState title="No inquiries found" subtitle="When someone sends an inquiry to one of your listings, it will appear here." />
             ) : (
                 <Stack spacing={2}>
                     {filtered.map((g) => (
                         <Paper key={g.listingId} sx={{ p: 2.2, borderRadius: 3 }}>
                             {/* Listing header */}
+                            {(() => {
+                                const openInquiries = g.inquiries.filter((x) => !x.isConfirmed);
+                                const acceptedInquiries = g.inquiries.filter((x) => x.isConfirmed);
+                                const showAccepted = !!expandedAccepted[g.listingId];
+
+                                return (
+                                    <>
                             <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                                 <Box sx={{ minWidth: 0 }}>
                                     <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2 }}>
                                         {g.listingTitle}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                                        Listing ID: {g.listingId ?? "—"} • Inquiries: {g.inquiries.length}
+                                        Listing ID: {g.listingId ?? "—"} • Open: {openInquiries.length} • Accepted: {acceptedInquiries.length}
                                     </Typography>
                                 </Box>
 
-                                <Chip
-                                    label={`${g.inquiries.length} inquiry${g.inquiries.length === 1 ? "" : "ies"}`}
-                                    variant="outlined"
-                                />
+                                <Stack direction="row" spacing={1} flexWrap="wrap">
+                                    <Chip
+                                        label={`${openInquiries.length} open`}
+                                        color={openInquiries.length ? "warning" : "default"}
+                                        variant="outlined"
+                                    />
+                                    <Chip
+                                        label={`${acceptedInquiries.length} accepted`}
+                                        color={acceptedInquiries.length ? "success" : "default"}
+                                        variant={acceptedInquiries.length ? "filled" : "outlined"}
+                                    />
+                                </Stack>
                             </Stack>
 
                             <Divider sx={{ my: 1.5 }} />
 
-                            {/* Inquiries cards (Fiverr-ish list) */}
+                            {/* Open inquiries first */}
                             <Stack spacing={1.2}>
-                                {g.inquiries.map((x) => (
+                                {openInquiries.length === 0 ? (
+                                    <Paper
+                                        variant="outlined"
+                                        sx={{ p: 1.4, borderRadius: 2.5, bgcolor: "#fafafa" }}
+                                    >
+                                        <Typography variant="body2" sx={{ opacity: 0.72 }}>
+                                            No new inquiries waiting here right now.
+                                        </Typography>
+                                    </Paper>
+                                ) : openInquiries.map((x) => (
                                     <Paper
                                         key={x.inquiryId}
                                         variant="outlined"
@@ -232,6 +274,8 @@ export default function MyInquiries() {
                                             borderRadius: 2.5,
                                             cursor: "pointer",
                                             transition: "0.15s",
+                                            bgcolor: "#fffdf4",
+                                            borderColor: "#fcd34d",
                                             "&:hover": { transform: "translateY(-1px)" },
                                         }}
                                         onClick={() => navigate(`/my-inquiries/${x.inquiryId}`)}
@@ -247,6 +291,7 @@ export default function MyInquiries() {
                                             </Box>
 
                                             <Stack alignItems="flex-end" spacing={0.4} sx={{ flex: "0 0 auto" }}>
+                                                <Chip label="Open" color="warning" size="small" variant="filled" />
                                                 <Typography sx={{ fontWeight: 900 }}>
                                                     {priceText(x)}
                                                 </Typography>
@@ -258,10 +303,76 @@ export default function MyInquiries() {
                                     </Paper>
                                 ))}
                             </Stack>
+
+                            {acceptedInquiries.length > 0 && (
+                                <>
+                                    <Divider sx={{ my: 1.5 }} />
+
+                                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }}>
+                                        <Box>
+                                            <Typography sx={{ fontWeight: 800 }}>
+                                                Accepted inquiries
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ opacity: 0.72 }}>
+                                                Archived below so the active inbox stays clean.
+                                            </Typography>
+                                        </Box>
+
+                                        <Button variant="outlined" onClick={() => toggleAccepted(g.listingId)} sx={{ fontWeight: 800 }}>
+                                            {showAccepted ? "Hide accepted" : `Expand accepted (${acceptedInquiries.length})`}
+                                        </Button>
+                                    </Stack>
+
+                                    {showAccepted && (
+                                        <Stack spacing={1.1} sx={{ mt: 1.5 }}>
+                                            {acceptedInquiries.map((x) => (
+                                                <Paper
+                                                    key={x.inquiryId}
+                                                    variant="outlined"
+                                                    sx={{
+                                                        p: 1.5,
+                                                        borderRadius: 2.5,
+                                                        cursor: "pointer",
+                                                        bgcolor: "#f0fdf4",
+                                                        borderColor: "#86efac",
+                                                        transition: "0.15s",
+                                                        "&:hover": { transform: "translateY(-1px)" },
+                                                    }}
+                                                    onClick={() => navigate(`/my-inquiries/${x.inquiryId}`)}
+                                                >
+                                                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                                                        <Box sx={{ minWidth: 0 }}>
+                                                            <Typography sx={{ fontWeight: 900 }}>
+                                                                Inquiry #{x.inquiryId}
+                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ opacity: 0.82 }}>
+                                                                {shortText(x.description, 120)}
+                                                            </Typography>
+                                                        </Box>
+
+                                                        <Stack alignItems="flex-end" spacing={0.4} sx={{ flex: "0 0 auto" }}>
+                                                            <Chip label="Accepted" color="success" size="small" variant="filled" />
+                                                            <Typography sx={{ fontWeight: 900 }}>
+                                                                {priceText(x)}
+                                                            </Typography>
+                                                            <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                                                                {dateText(x.creationDate)}
+                                                            </Typography>
+                                                        </Stack>
+                                                    </Stack>
+                                                </Paper>
+                                            ))}
+                                        </Stack>
+                                    )}
+                                </>
+                            )}
+                                    </>
+                                );
+                            })()}
                         </Paper>
                     ))}
                 </Stack>
             )}
-        </Container>
+        </PageShell>
     );
 }

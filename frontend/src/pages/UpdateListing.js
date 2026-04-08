@@ -4,10 +4,8 @@ import {
     Box,
     Button,
     Chip,
-    Container,
     Divider,
     IconButton,
-    Paper,
     Stack,
     TextField,
     Typography,
@@ -19,6 +17,7 @@ import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import { useNavigate, useParams } from "react-router-dom";
+import { PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
 const API_URL = "https://localhost:7278";
 
@@ -70,7 +69,7 @@ export default function UpdateListing() {
                 const res = await fetch(`${API_URL}/api/listings/${id}`, { headers: authHeaders });
                 if (!res.ok) {
                     const txt = await res.text().catch(() => "");
-                    alert(`Nepavyko gauti skelbimo: ${res.status} ${txt}`);
+                    alert(`Failed to load listing: ${res.status} ${txt}`);
                     navigate("/my-listings");
                     return;
                 }
@@ -102,7 +101,7 @@ export default function UpdateListing() {
                 setLoading(false);
             } catch (e) {
                 console.error(e);
-                alert("Klaida kraunant duomenis");
+                alert("Error while loading listing data.");
                 navigate("/my-listings");
             }
         })();
@@ -176,7 +175,7 @@ export default function UpdateListing() {
 
         const res = await fetch(`${API_URL}/api/listings/${id}/photos`, {
             method: "POST",
-            headers: authHeaders, // Authorization OK; content-type nededam
+            headers: authHeaders,
             body: fd
         });
 
@@ -200,7 +199,7 @@ export default function UpdateListing() {
             });
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Klaida: ${res.status} ${txt}`);
+                alert(`Error: ${res.status} ${txt}`);
                 return;
             }
             await refreshPhotos();
@@ -210,7 +209,7 @@ export default function UpdateListing() {
     };
 
     const deleteExisting = async (photoId) => {
-        const ok = window.confirm("Delete photo?");
+        const ok = window.confirm("Delete this photo?");
         if (!ok) return;
 
         try {
@@ -220,7 +219,7 @@ export default function UpdateListing() {
             });
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Klaida: ${res.status} ${txt}`);
+                alert(`Error: ${res.status} ${txt}`);
                 return;
             }
             await refreshPhotos();
@@ -258,7 +257,7 @@ export default function UpdateListing() {
 
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Klaida: ${res.status} ${txt}`);
+                alert(`Error: ${res.status} ${txt}`);
                 return;
             }
 
@@ -274,23 +273,27 @@ export default function UpdateListing() {
     };
 
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
-            <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-                Update Listing
-            </Typography>
-
-            {/* ✅ PRIVERSTINIS LAYOUT: VISADA KAIRe + DESINE (desktop), mobile – tvarkingai column */}
+        <PageShell
+            maxWidth="xl"
+            compact
+            hero={
+                <PageHero
+                    eyebrow="Update listing"
+                    title="Keep your service offer polished."
+                    subtitle="Update the content, refresh your images, and maintain a stronger marketplace presentation."
+                />
+            }
+        >
             <Box
                 sx={{
                     display: "flex",
                     gap: 2,
                     alignItems: "flex-start",
-                    flexDirection: { xs: "column", md: "row" } // jei nori VISADA row -> pakeisk į "row"
+                    flexDirection: { xs: "column", md: "row" }
                 }}
             >
-                {/* LEFT - Photos */}
                 <Box sx={{ flex: "0 0 360px", width: { xs: "100%", md: 360 } }}>
-                    <Paper sx={{ p: 2 }}>
+                    <SectionCard title="Photos" subtitle="Manage existing images and upload fresh preview content.">
                         <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>
                             Photos
                         </Typography>
@@ -450,12 +453,11 @@ export default function UpdateListing() {
                                 </>
                             ) : null}
                         </Stack>
-                    </Paper>
+                    </SectionCard>
                 </Box>
 
-                {/* RIGHT - Form */}
                 <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
-                    <Paper sx={{ p: 2 }}>
+                    <SectionCard title="Listing details" subtitle="Edit pricing, timing, category, and the main service description.">
                         <Stack spacing={2}>
                             <TextField
                                 label="Title"
@@ -527,9 +529,9 @@ export default function UpdateListing() {
                                 </Button>
                             </Stack>
                         </Stack>
-                    </Paper>
+                    </SectionCard>
                 </Box>
             </Box>
-        </Container>
+        </PageShell>
     );
 }

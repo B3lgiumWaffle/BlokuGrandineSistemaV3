@@ -256,11 +256,211 @@ public class AdminController : ControllerBase
             })
             .ToListAsync(ct);
 
+        var ratingsSummary = await BuildUserRatingsSummary(userId, ct);
+
         return Ok(new
         {
             user,
+            ratings = ratingsSummary,
             listings
         });
+    }
+
+    [HttpDelete("users/{userId:int}")]
+    public async Task<IActionResult> DeleteUser(int userId, CancellationToken ct)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var currentAdminId = GetUserIdFromJwt();
+        if (currentAdminId == null) return Unauthorized();
+
+        if (currentAdminId.Value == userId)
+            return BadRequest(new { message = "You cannot delete your own admin profile." });
+
+        var user = await _db.b_users
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.UserId == userId, ct);
+
+        if (user == null)
+            return NotFound(new { message = "User not found." });
+
+        if (user.Role != null && user.Role.RoleName == "Admin")
+            return BadRequest(new { message = "Admin profile cannot be deleted." });
+
+        var listingIds = await _db.b_listings
+            .Where(l => l.userId == userId)
+            .Select(l => l.listingId)
+            .ToListAsync(ct);
+
+        var contractIds = await _db.b_contracts
+            .Where(c => c.fkClientUserId == userId || c.fkProviderUserId == userId)
+            .Select(c => c.contractId)
+            .ToListAsync(ct);
+
+        var inquiryIds = await _db.b_inquiries
+            .Where(i => i.fk_userId == userId || listingIds.Contains(i.fk_listingId))
+            .Select(i => i.inquiryId)
+            .ToListAsync(ct);
+
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        try
+        {
+            // direct user-linked data
+            var notifications = await _db.b_notifications
+                .Where(x => x.fkUserId == userId)
+                .ToListAsync(ct);
+            _db.b_notifications.RemoveRange(notifications);
+
+            var ratings = await _db.b_ratings
+                .Where(x =>
+                    x.fkFromUserId == userId ||
+                    x.fkToUserId == userId ||
+                    contractIds.Contains(x.fkContractId) ||
+                    listingIds.Contains(x.fkListingId))
+                .ToListAsync(ct);
+            _db.b_ratings.RemoveRange(ratings);
+
+            var comments = await _db.b_comments
+                .Where(x =>
+                    x.fkUserId == userId ||
+                    contractIds.Contains(x.fkContractId) ||
+                    listingIds.Contains(x.fkListingId))
+                .ToListAsync(ct);
+            _db.b_comments.RemoveRange(comments);
+
+            var contractMessages = await _db.b_contract_messages
+                .Where(x =>
+                    x.fkSenderUserId == userId ||
+                    x.fkReceiverUserId == userId ||
+                    contractIds.Contains(x.fkContractId))
+                .ToListAsync(ct);
+            _db.b_contract_messages.RemoveRange(contractMessages);
+
+            var oldMessages = await _db.b_contract_messages
+                .Where(x =>
+                    x.fkSenderUserId == userId ||
+                    x.fkReceiverUserId == userId ||
+                    contractIds.Contains(x.fkContractId))
+                .ToListAsync(ct);
+            _db.b_contract_messages.RemoveRange(oldMessages);
+
+            var fragmentHistory = await _db.b_completed_list_fragment_histories
+                .Where(x =>
+                    x.changedByUserId == userId ||
+                    contractIds.Contains(x.fkContractId))
+                .ToListAsync(ct);
+            _db.b_completed_list_fragment_histories.RemoveRange(fragmentHistory);
+
+            var fragments = await _db.b_completed_listing_fragments
+                .Where(x =>
+                    x.submittedByUserId == userId ||
+                    x.approvedByUserId == userId ||
+                    contractIds.Contains(x.fkContractId))
+                .ToListAsync(ct);
+            _db.b_completed_listing_fragments.RemoveRange(fragments);
+
+            var contractHistory = await _db.b_contract_histories
+                .Where(x =>
+                    x.changedByUserId == userId ||
+                    contractIds.Contains(x.fkContractId))
+                .ToListAsync(ct);
+            _db.b_contract_histories.RemoveRange(contractHistory);
+
+            // contracts first
+            var contracts = await _db.b_contracts
+                .Where(x => contractIds.Contains(x.contractId))
+                .ToListAsync(ct);
+            _db.b_contracts.RemoveRange(contracts);
+
+            // inquiries and requirements
+            var requirements = await _db.b_requirements
+                .Where(x => inquiryIds.Contains(x.fk_inquiryId))
+                .ToListAsync(ct);
+            _db.b_requirements.RemoveRange(requirements);
+
+            var inquiries = await _db.b_inquiries
+                .Where(x => inquiryIds.Contains(x.inquiryId))
+                .ToListAsync(ct);
+            _db.b_inquiries.RemoveRange(inquiries);
+
+            // listings and photos
+            var listingPhotos = await _db.b_listing_photos
+                .Where(x => listingIds.Contains(x.listingId))
+                .ToListAsync(ct);
+            _db.b_listing_photos.RemoveRange(listingPhotos);
+
+            var listings = await _db.b_listings
+                .Where(x => listingIds.Contains(x.listingId))
+                .ToListAsync(ct);
+            _db.b_listings.RemoveRange(listings);
+
+            _db.b_users.Remove(user);
+
+            await _db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+
+            return Ok(new { message = "User profile deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync(ct);
+            return BadRequest(new
+            {
+                message = "Failed to delete user profile.",
+                error = ex.Message
+            });
+        }
+    }
+
+    private async Task<object> BuildUserRatingsSummary(int userId, CancellationToken ct)
+    {
+        var userRatings = await _db.b_ratings
+            .AsNoTracking()
+            .Where(r => r.fkToUserId == userId)
+            .ToListAsync(ct);
+
+        var userRatingValues = userRatings
+            .Where(r => r.userRating.HasValue)
+            .Select(r => (decimal)r.userRating!.Value)
+            .ToList();
+
+        var systemRatingValues = userRatings
+            .Where(r => r.systemRating.HasValue)
+            .Select(r => r.systemRating!.Value)
+            .ToList();
+
+        decimal? userRatingAverage = userRatingValues.Count > 0
+            ? Math.Round(userRatingValues.Average(), 2)
+            : null;
+
+        decimal? systemRatingAverage = systemRatingValues.Count > 0
+            ? Math.Round(systemRatingValues.Average(), 2)
+            : null;
+
+        int dangerPoints = 0;
+
+        if (systemRatingAverage.HasValue && systemRatingAverage.Value <= 1m)
+            dangerPoints++;
+
+        if (userRatingAverage.HasValue && userRatingAverage.Value <= 1m)
+            dangerPoints++;
+
+        var dangerLabel = dangerPoints switch
+        {
+            >= 2 => "ExtraDangerous",
+            1 => "Dangerous",
+            _ => "Safe"
+        };
+
+        return new
+        {
+            totalRatings = userRatings.Count,
+            userRatingAverage,
+            systemRatingAverage,
+            dangerPoints,
+            dangerLabel
+        };
     }
 
     private bool IsAdmin()

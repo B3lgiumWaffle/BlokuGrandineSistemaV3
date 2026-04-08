@@ -14,6 +14,13 @@ import { useNavigate, useParams } from "react-router-dom";
 
 const API_URL = "https://localhost:7278";
 
+function ratingValue(v) {
+    if (v === null || v === undefined) return "—";
+    const n = Number(v);
+    if (Number.isNaN(n)) return "—";
+    return n.toFixed(2);
+}
+
 export default function UserProfileMonitoringDetails() {
     const { userId } = useParams();
     const navigate = useNavigate();
@@ -22,9 +29,9 @@ export default function UserProfileMonitoringDetails() {
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState("");
     const [item, setItem] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
-
         let alive = true;
 
         (async () => {
@@ -57,7 +64,46 @@ export default function UserProfileMonitoringDetails() {
         return () => {
             alive = false;
         };
-    }, [navigate, token, userId]);
+    }, [token, userId]);
+
+    async function handleDeleteUser() {
+        const ok = window.confirm(
+            "Ar tikrai nori ištrinti šį naudotoją? Bus ištrinti susiję duomenys."
+        );
+        if (!ok) return;
+
+        try {
+            setDeleting(true);
+            setErr("");
+
+            const res = await fetch(`${API_URL}/api/admin/users/${userId}`, {
+                method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+
+            if (!res.ok) {
+                const txt = await res.text().catch(() => "");
+                throw new Error(`${res.status} ${txt}`);
+            }
+
+            navigate("/user-profile-monitoring");
+        } catch (e) {
+            setErr(e?.message ?? "Failed to delete user");
+        } finally {
+            setDeleting(false);
+        }
+    }
+
+    const dangerLabel = item?.ratings?.dangerLabel ?? "Safe";
+
+    const dangerChipColor =
+        dangerLabel === "ExtraDangerous"
+            ? "error"
+            : dangerLabel === "Dangerous"
+                ? "warning"
+                : "success";
 
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
@@ -89,6 +135,7 @@ export default function UserProfileMonitoringDetails() {
                     <Typography variant="h6" sx={{ fontWeight: 900 }}>
                         {item.user?.username}
                     </Typography>
+
                     <Typography variant="body2">User ID: {item.user?.userId}</Typography>
                     <Typography variant="body2">Email: {item.user?.email}</Typography>
                     <Typography variant="body2">Role: {item.user?.role}</Typography>
@@ -96,30 +143,89 @@ export default function UserProfileMonitoringDetails() {
                     <Divider sx={{ my: 2 }} />
 
                     <Typography sx={{ fontWeight: 900, mb: 1 }}>
-                        User Listings
+                        Ratings Information
                     </Typography>
 
+                    <Stack spacing={0.8}>
+                        <Typography variant="body2">
+                            System rating average: {ratingValue(item.ratings?.systemRatingAverage)}
+                        </Typography>
+                        <Typography variant="body2">
+                            User rating average: {ratingValue(item.ratings?.userRatingAverage)}
+                        </Typography>
+                        <Typography variant="body2">
+                            Total ratings: {item.ratings?.totalRatings ?? 0}
+                        </Typography>
+                        <Typography variant="body2">
+                            Danger points: {item.ratings?.dangerPoints ?? 0}
+                        </Typography>
+
+                        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                            <Chip
+                                label={
+                                    dangerLabel === "ExtraDangerous"
+                                        ? "Extra dangerous"
+                                        : dangerLabel === "Dangerous"
+                                            ? "Dangerous"
+                                            : "Safe"
+                                }
+                                color={dangerChipColor}
+                                variant={dangerLabel === "Safe" ? "outlined" : "filled"}
+                            />
+                        </Stack>
+                    </Stack>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        sx={{ mb: 1 }}
+                    >
+                        <Typography sx={{ fontWeight: 900 }}>
+                            User Listings
+                        </Typography>
+
+                        <Button
+                            variant="contained"
+                            color="error"
+                            onClick={handleDeleteUser}
+                            disabled={deleting}
+                        >
+                            {deleting ? "Deleting..." : "Delete profile"}
+                        </Button>
+                    </Stack>
+
                     <Stack spacing={1.2}>
-                        {(item.listings ?? []).map((l) => (
-                            <Paper key={l.listingId} variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
-                                <Typography sx={{ fontWeight: 800 }}>{l.title}</Typography>
-                                <Typography variant="body2">Listing ID: {l.listingId}</Typography>
-                                <Typography variant="body2">
-                                    Uploaded: {l.uploadTime ? new Date(l.uploadTime).toLocaleString() : "—"}
-                                </Typography>
-                                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                                    <Chip
-                                        label={l.isActivated ? "Approved" : "Inactive"}
-                                        variant="outlined"
-                                    />
-                                </Stack>
-                                {l.adminComment ? (
-                                    <Typography variant="body2" sx={{ mt: 1, opacity: 0.85 }}>
-                                        Admin comment: {l.adminComment}
-                                    </Typography>
-                                ) : null}
+                        {(item.listings ?? []).length === 0 ? (
+                            <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
+                                <Typography variant="body2">No listings found.</Typography>
                             </Paper>
-                        ))}
+                        ) : (
+                            (item.listings ?? []).map((l) => (
+                                <Paper key={l.listingId} variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
+                                    <Typography sx={{ fontWeight: 800 }}>{l.title}</Typography>
+                                    <Typography variant="body2">Listing ID: {l.listingId}</Typography>
+                                    <Typography variant="body2">
+                                        Uploaded: {l.uploadTime ? new Date(l.uploadTime).toLocaleString() : "—"}
+                                    </Typography>
+
+                                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                                        <Chip
+                                            label={Number(l.isActivated) === 1 ? "Approved" : "Inactive"}
+                                            variant="outlined"
+                                        />
+                                    </Stack>
+
+                                    {l.adminComment ? (
+                                        <Typography variant="body2" sx={{ mt: 1, opacity: 0.85 }}>
+                                            Admin comment: {l.adminComment}
+                                        </Typography>
+                                    ) : null}
+                                </Paper>
+                            ))
+                        )}
                     </Stack>
                 </Paper>
             )}

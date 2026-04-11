@@ -40,6 +40,9 @@ namespace BlokuGrandiniuSistema.Controllers;
             if (string.IsNullOrWhiteSpace(dto.Description)) return BadRequest("Description is required.");
             if (dto.Requirements == null || dto.Requirements.Count == 0) return BadRequest("At least one requirement is required.");
 
+            var contractTermsValidationError = ValidateContractTerms(dto.ContractTerms);
+            if (contractTermsValidationError != null) return BadRequest(contractTermsValidationError);
+
             var listing = await _db.b_listings
                 .AsNoTracking()
                 .FirstOrDefaultAsync(l => l.listingId == dto.FkListingId, ct);
@@ -66,6 +69,8 @@ namespace BlokuGrandiniuSistema.Controllers;
 
             _db.b_inquiries.Add(inquiry);
             await _db.SaveChangesAsync(ct);
+
+            _db.b_inquiry_contract_terms.Add(MapContractTerms(dto.ContractTerms, inquiry.inquiryId));
 
             foreach (var r in dto.Requirements)
             {
@@ -272,6 +277,9 @@ namespace BlokuGrandiniuSistema.Controllers;
         if (dto.Requirements.Any(r => string.IsNullOrWhiteSpace(r.Description)))
             return BadRequest("Requirements cannot contain empty descriptions.");
 
+        var contractTermsValidationError = ValidateContractTerms(dto.ContractTerms);
+        if (contractTermsValidationError != null) return BadRequest(contractTermsValidationError);
+
         // (optional) jei nori uždrausti praeities datą
         // if (dto.Requirements.Any(r => r.ForseenCompletionDate.HasValue && r.ForseenCompletionDate.Value.Date < DateTime.UtcNow.Date))
         //     return BadRequest("ForseenCompletionDate cannot be in the past.");
@@ -307,6 +315,9 @@ namespace BlokuGrandiniuSistema.Controllers;
 
             if (string.IsNullOrWhiteSpace(dto.Description)) return BadRequest("Description is required.");
             if (dto.Requirements == null || dto.Requirements.Count == 0) return BadRequest("At least one requirement is required.");
+
+            var contractTermsValidationError = ValidateContractTerms(dto.ContractTerms);
+            if (contractTermsValidationError != null) return BadRequest(contractTermsValidationError);
 
 
             var inquiry = await _db.b_inquiries.FirstOrDefaultAsync(i => i.inquiryId == id, ct);
@@ -517,7 +528,7 @@ namespace BlokuGrandiniuSistema.Controllers;
     // ---------------------------
     [Authorize]
     [HttpPost("contracts/{contractId:int}/fragments/{fragmentId:int}/approve")]
-    public async Task<IActionResult> ApproveFragment(
+        public async Task<IActionResult> ApproveFragment(
         int contractId,
         int fragmentId,
         [FromBody] ApproveFragmentDTO dto,
@@ -545,32 +556,13 @@ namespace BlokuGrandiniuSistema.Controllers;
 
         if (milestone == null) return NotFound("Milestone not found.");
 
-        var requirementDeadline = await GetMilestoneDeadline(milestone.fkRequirementId, ct);
-        var contractDeadline = await GetContractDeadline(contract.fkInquiryId, ct);
-
-        var submissionCount = await _db.b_completed_listing_fragments
-            .CountAsync(f => f.fkContractId == contractId && f.fkMilestoneId == milestone.milestoneId, ct);
-
-        var isLastMilestone = await IsLastMilestone(contractId, milestone.milestoneNo, ct);
-
-        var isLateForRequirement = requirementDeadline.HasValue && fragment.submittedAt.Date > requirementDeadline.Value.Date;
-        var isLateForContractEnd = isLastMilestone && contractDeadline.HasValue && fragment.submittedAt.Date > contractDeadline.Value.Date;
-        var tooManyAttempts = submissionCount > 3;
-
-        var shouldSplit50_50 = isLateForRequirement || isLateForContractEnd || tooManyAttempts;
-
-        var expectedFullAmount = milestone.amountEth ?? 0m;
-        var expectedProviderAmountEth = shouldSplit50_50
-            ? Math.Round(expectedFullAmount / 2m, 8, MidpointRounding.AwayFromZero)
-            : expectedFullAmount;
-
-        var expectedClientRefundAmountEth = Math.Round(expectedFullAmount - expectedProviderAmountEth, 8, MidpointRounding.AwayFromZero);
+        var settlement = await BuildSettlementDecision(contract, milestone, fragment, ct);
 
         if (dto == null || string.IsNullOrWhiteSpace(dto.ReleaseTxHash))
             return BadRequest("ReleaseTxHash is required after on-chain settlement.");
 
-        if (dto.ProviderAmountEth != expectedProviderAmountEth ||
-            dto.ClientRefundAmountEth != expectedClientRefundAmountEth)
+        if (dto.ProviderAmountEth != settlement.ProviderAmountEth ||
+            dto.ClientRefundAmountEth != settlement.ClientRefundAmountEth)
         {
             return BadRequest("Settlement amounts do not match backend rules.");
         }
@@ -584,16 +576,16 @@ namespace BlokuGrandiniuSistema.Controllers;
         var oldFragmentStatus = fragment.status;
         var oldContractStatus = contract.status;
 
-        fragment.status = shouldSplit50_50 ? "ApprovedPartial" : "Approved";
+        fragment.status = settlement.WasPartial ? "ApprovedPartial" : "Approved";
         fragment.reviewComment = string.IsNullOrWhiteSpace(dto.ReviewComment)
-            ? BuildApprovalReason(isLateForRequirement, isLateForContractEnd, tooManyAttempts, submissionCount)
+            ? settlement.Reason
             : dto.ReviewComment.Trim();
         fragment.approvedByUserId = userId.Value;
         fragment.approvedAt = DateTime.UtcNow;
         fragment.releaseTxHash = txHash;
         fragment.updatedAt = DateTime.UtcNow;
 
-        milestone.status = shouldSplit50_50 ? "ReleasedPartial" : "Released";
+        milestone.status = settlement.WasPartial ? "ReleasedPartial" : "Released";
         milestone.releaseTxHash = txHash;
         milestone.releasedAt = DateTime.UtcNow;
         milestone.updatedAt = DateTime.UtcNow;
@@ -616,7 +608,7 @@ namespace BlokuGrandiniuSistema.Controllers;
             newStatus = contract.status,
             changedByUserId = userId.Value,
             changedAt = DateTime.UtcNow,
-            note = shouldSplit50_50
+            note = settlement.WasPartial
                 ? $"Milestone #{milestone.milestoneNo} approved with partial payout/refund. Provider={providerAmountEth.ToString(CultureInfo.InvariantCulture)} ETH, ClientRefund={clientRefundAmountEth.ToString(CultureInfo.InvariantCulture)} ETH."
                 : $"Milestone #{milestone.milestoneNo} approved with full payout."
         });
@@ -629,19 +621,19 @@ namespace BlokuGrandiniuSistema.Controllers;
             newStatus = fragment.status,
             changedByUserId = userId.Value,
             changedAt = DateTime.UtcNow,
-            note = BuildApprovalReason(isLateForRequirement, isLateForContractEnd, tooManyAttempts, submissionCount),
-            delayInDays = CalculateDelayInDays(fragment.submittedAt, requirementDeadline),
+            note = settlement.Reason,
+            delayInDays = settlement.DelayInDays,
             isFinalState = true
         });
 
         _db.b_notifications.Add(new b_notification
         {
             fkUserId = contract.fkProviderUserId,
-            title = shouldSplit50_50 ? "Partial payout processed" : "Fragment approved",
-            message = shouldSplit50_50
+            title = settlement.WasPartial ? "Partial payout processed" : "Fragment approved",
+            message = settlement.WasPartial
                 ? $"Fragment approved with partial payout for contract #{contract.contractId}."
                 : $"Fragment approved and payout released for contract #{contract.contractId}.",
-            type = shouldSplit50_50 ? "contract_fragment_partial_release" : "contract_fragment_release",
+            type = settlement.WasPartial ? "contract_fragment_partial_release" : "contract_fragment_release",
             referenceId = contract.contractId,
             isRead = false,
             createdAt = DateTime.UtcNow
@@ -664,14 +656,21 @@ namespace BlokuGrandiniuSistema.Controllers;
             milestoneStatus = milestone.status,
             payout = new
             {
-                fullAmountEth = expectedFullAmount,
+                fullAmountEth = settlement.FullAmountEth,
                 providerAmountEth,
                 clientRefundAmountEth,
-                wasPartial = shouldSplit50_50,
-                submissionCount,
-                isLateForRequirement,
-                isLateForContractEnd,
-                tooManyAttempts,
+                wasPartial = settlement.WasPartial,
+                submissionCount = settlement.SubmissionCount,
+                rejectedCountForMilestone = settlement.RejectedCountForMilestone,
+                isLateForRequirement = settlement.IsLateForRequirement,
+                isLateForContractEnd = settlement.IsLateForContractEnd,
+                tooManyAttempts = settlement.TooManyAttempts,
+                isLowFragmentSpeed = settlement.IsLowFragmentSpeed,
+                isHighRevisionCount = settlement.IsHighRevisionCount,
+                isLowContractSpeed = settlement.IsLowContractSpeed,
+                isLowMessageResponse = settlement.IsLowMessageResponse,
+                hasTooManyRejectedFragments = settlement.HasTooManyRejectedFragments,
+                appliedRefundPercent = settlement.AppliedRefundPercent,
                 txHash
             }
         });
@@ -710,26 +709,7 @@ namespace BlokuGrandiniuSistema.Controllers;
 
         if (milestone == null) return NotFound("Milestone not found.");
 
-        var requirementDeadline = await GetMilestoneDeadline(milestone.fkRequirementId, ct);
-        var contractDeadline = await GetContractDeadline(contract.fkInquiryId, ct);
-
-        var submissionCount = await _db.b_completed_listing_fragments
-            .CountAsync(f => f.fkContractId == contractId && f.fkMilestoneId == milestone.milestoneId, ct);
-
-        var isLastMilestone = await IsLastMilestone(contractId, milestone.milestoneNo, ct);
-
-        var isLateForRequirement = requirementDeadline.HasValue && fragment.submittedAt.Date > requirementDeadline.Value.Date;
-        var isLateForContractEnd = isLastMilestone && contractDeadline.HasValue && fragment.submittedAt.Date > contractDeadline.Value.Date;
-        var tooManyAttempts = submissionCount > 3;
-
-        var shouldSplit50_50 = isLateForRequirement || isLateForContractEnd || tooManyAttempts;
-
-        var fullAmountEth = milestone.amountEth ?? 0m;
-        var providerAmountEth = shouldSplit50_50
-            ? Math.Round(fullAmountEth / 2m, 8, MidpointRounding.AwayFromZero)
-            : fullAmountEth;
-
-        var clientRefundAmountEth = Math.Round(fullAmountEth - providerAmountEth, 8, MidpointRounding.AwayFromZero);
+        var settlement = await BuildSettlementDecision(contract, milestone, fragment, ct);
 
         return Ok(new
         {
@@ -738,15 +718,21 @@ namespace BlokuGrandiniuSistema.Controllers;
             milestoneId = milestone.milestoneId,
             milestoneNo = milestone.milestoneNo,
             milestoneIndex = milestone.milestoneNo - 1,
-            fullAmountEth,
-            providerAmountEth,
-            clientRefundAmountEth,
-            wasPartial = shouldSplit50_50,
-            submissionCount,
-            isLateForRequirement,
-            isLateForContractEnd,
-            tooManyAttempts,
-            reason = BuildApprovalReason(isLateForRequirement, isLateForContractEnd, tooManyAttempts, submissionCount)
+            fullAmountEth = settlement.FullAmountEth,
+            providerAmountEth = settlement.ProviderAmountEth,
+            clientRefundAmountEth = settlement.ClientRefundAmountEth,
+            wasPartial = settlement.WasPartial,
+            submissionCount = settlement.SubmissionCount,
+            isLateForRequirement = settlement.IsLateForRequirement,
+            isLateForContractEnd = settlement.IsLateForContractEnd,
+            tooManyAttempts = settlement.TooManyAttempts,
+            isLowFragmentSpeed = settlement.IsLowFragmentSpeed,
+            isHighRevisionCount = settlement.IsHighRevisionCount,
+            isLowContractSpeed = settlement.IsLowContractSpeed,
+            isLowMessageResponse = settlement.IsLowMessageResponse,
+            hasTooManyRejectedFragments = settlement.HasTooManyRejectedFragments,
+            appliedRefundPercent = settlement.AppliedRefundPercent,
+            reason = settlement.Reason
         });
     }
 
@@ -845,6 +831,28 @@ namespace BlokuGrandiniuSistema.Controllers;
              inquiry.modifiedAt = DateTime.UtcNow;
             // inquiry.ModifiedNote = string.IsNullOrWhiteSpace(dto.ModifiedNote) ? null : dto.ModifiedNote.Trim();
 
+            var existingTerms = await _db.b_inquiry_contract_terms
+                .FirstOrDefaultAsync(t => t.fkInquiryId == inquiry.inquiryId, ct);
+
+            if (existingTerms == null)
+            {
+                _db.b_inquiry_contract_terms.Add(MapContractTerms(dto.ContractTerms, inquiry.inquiryId));
+            }
+            else
+            {
+                existingTerms.fragmentSpeedMinScore = dto.ContractTerms.FragmentSpeedMinScore;
+                existingTerms.fragmentSpeedRefundPercent = dto.ContractTerms.FragmentSpeedRefundPercent;
+                existingTerms.revisionCountMaxAverage = dto.ContractTerms.RevisionCountMaxAverage;
+                existingTerms.revisionCountRefundPercent = dto.ContractTerms.RevisionCountRefundPercent;
+                existingTerms.contractSpeedMinScore = dto.ContractTerms.ContractSpeedMinScore;
+                existingTerms.contractSpeedRefundPercent = dto.ContractTerms.ContractSpeedRefundPercent;
+                existingTerms.messageResponseMinScore = dto.ContractTerms.MessageResponseMinScore;
+                existingTerms.messageResponseRefundPercent = dto.ContractTerms.MessageResponseRefundPercent;
+                existingTerms.rejectedFragmentsMaxCount = dto.ContractTerms.RejectedFragmentsMaxCount;
+                existingTerms.rejectedFragmentsRefundPercent = dto.ContractTerms.RejectedFragmentsRefundPercent;
+                existingTerms.updatedAt = DateTime.UtcNow;
+            }
+
             var existingReqs = await _db.b_requirements
                 .Where(r => r.fk_inquiryId == inquiry.inquiryId)
                 .ToListAsync(ct);
@@ -859,8 +867,9 @@ namespace BlokuGrandiniuSistema.Controllers;
 
                 if (r.RequirementId.HasValue)
                 {
-                    entity = existingReqs.FirstOrDefault(x => x.requirementId == r.RequirementId.Value);
-                    if (entity == null) continue;
+                    var existingEntity = existingReqs.FirstOrDefault(x => x.requirementId == r.RequirementId.Value);
+                    if (existingEntity == null) continue;
+                    entity = existingEntity;
                     keepIds.Add(entity.requirementId);
                 }
                 else
@@ -924,6 +933,24 @@ namespace BlokuGrandiniuSistema.Controllers;
                 })
                 .ToListAsync(ct);
 
+            var contractTerms = await _db.b_inquiry_contract_terms
+                .AsNoTracking()
+                .Where(t => t.fkInquiryId == inquiry.inquiryId)
+                .Select(t => new InquiryContractTermsDetailsDTO
+                {
+                    FragmentSpeedMinScore = t.fragmentSpeedMinScore,
+                    FragmentSpeedRefundPercent = t.fragmentSpeedRefundPercent,
+                    RevisionCountMaxAverage = t.revisionCountMaxAverage,
+                    RevisionCountRefundPercent = t.revisionCountRefundPercent,
+                    ContractSpeedMinScore = t.contractSpeedMinScore,
+                    ContractSpeedRefundPercent = t.contractSpeedRefundPercent,
+                    MessageResponseMinScore = t.messageResponseMinScore,
+                    MessageResponseRefundPercent = t.messageResponseRefundPercent,
+                    RejectedFragmentsMaxCount = t.rejectedFragmentsMaxCount,
+                    RejectedFragmentsRefundPercent = t.rejectedFragmentsRefundPercent
+                })
+                .FirstOrDefaultAsync(ct);
+
             return new InquiryDetailsDTO
             {
                 InquiryId = inquiry.inquiryId,
@@ -944,9 +971,147 @@ namespace BlokuGrandiniuSistema.Controllers;
                 // ModifiedNote = inquiry.ModifiedNote,
                  ModifiedAt = inquiry.modifiedAt,
 
-                Requirements = reqs
+                Requirements = reqs,
+                ContractTerms = contractTerms
             };
         }
+
+    private async Task<SettlementDecision> BuildSettlementDecision(
+        b_contract contract,
+        b_contract_milestone milestone,
+        b_completed_listing_fragment fragment,
+        CancellationToken ct)
+    {
+        var terms = await GetContractTerms(contract.fkInquiryId, ct);
+
+        var requirementDeadline = await GetMilestoneDeadline(milestone.fkRequirementId, ct);
+        var contractDeadline = await GetContractDeadline(contract.fkInquiryId, ct);
+
+        var isLastMilestone = await IsLastMilestone(contract.contractId, milestone.milestoneNo, ct);
+        var isLateForRequirement = requirementDeadline.HasValue && fragment.submittedAt.Date > requirementDeadline.Value.Date;
+        var isLateForContractEnd = isLastMilestone && contractDeadline.HasValue && fragment.submittedAt.Date > contractDeadline.Value.Date;
+        var submissionCount = await _db.b_completed_listing_fragments
+            .CountAsync(f => f.fkContractId == contract.contractId && f.fkMilestoneId == milestone.milestoneId, ct);
+        var rejectedCountForMilestone = await _db.b_completed_list_fragment_histories
+            .CountAsync(h =>
+                h.fkContractId == contract.contractId &&
+                h.milestoneIndex == milestone.milestoneNo &&
+                h.newStatus == "Rejected", ct);
+
+        var isHighRevisionCount = rejectedCountForMilestone > terms.revisionCountMaxAverage;
+        var isLateDelivery = isLateForRequirement || isLateForContractEnd;
+        var isLowMessageResponse = false;
+        var hasTooManyRejectedFragments = false;
+
+        var appliedRefundPercent = new[]
+        {
+            isHighRevisionCount ? terms.revisionCountRefundPercent : 0m,
+            isLateDelivery ? terms.contractSpeedRefundPercent : 0m
+        }.DefaultIfEmpty(0m).Max();
+
+        appliedRefundPercent = Math.Clamp(appliedRefundPercent, 0m, 100m);
+
+        var fullAmountEth = milestone.amountEth ?? 0m;
+        var clientRefundAmountEth = Math.Round(fullAmountEth * appliedRefundPercent / 100m, 8, MidpointRounding.AwayFromZero);
+        var providerAmountEth = Math.Round(fullAmountEth - clientRefundAmountEth, 8, MidpointRounding.AwayFromZero);
+
+        return new SettlementDecision
+        {
+            FullAmountEth = fullAmountEth,
+            ProviderAmountEth = providerAmountEth,
+            ClientRefundAmountEth = clientRefundAmountEth,
+            WasPartial = clientRefundAmountEth > 0m,
+            AppliedRefundPercent = appliedRefundPercent,
+            SubmissionCount = submissionCount,
+            RejectedCountForMilestone = rejectedCountForMilestone,
+            IsLateForRequirement = isLateForRequirement,
+            IsLateForContractEnd = isLateForContractEnd,
+            TooManyAttempts = false,
+            IsLowFragmentSpeed = false,
+            IsHighRevisionCount = isHighRevisionCount,
+            IsLowContractSpeed = isLateDelivery,
+            IsLowMessageResponse = isLowMessageResponse,
+            HasTooManyRejectedFragments = hasTooManyRejectedFragments,
+            DelayInDays = CalculateDelayInDays(fragment.submittedAt, requirementDeadline),
+            Reason = BuildApprovalReason(
+                rejectedCountForMilestone,
+                isLateForRequirement,
+                isLateForContractEnd,
+                false,
+                isHighRevisionCount,
+                isLateDelivery,
+                isLowMessageResponse,
+                hasTooManyRejectedFragments,
+                appliedRefundPercent)
+        };
+    }
+
+    private async Task<b_inquiry_contract_term> GetContractTerms(int inquiryId, CancellationToken ct)
+    {
+        var terms = await _db.b_inquiry_contract_terms
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.fkInquiryId == inquiryId, ct);
+
+        return terms ?? new b_inquiry_contract_term
+        {
+            fkInquiryId = inquiryId,
+            fragmentSpeedMinScore = 2.00m,
+            fragmentSpeedRefundPercent = 0.00m,
+            revisionCountMaxAverage = 3.00m,
+            revisionCountRefundPercent = 0.00m,
+            contractSpeedMinScore = 2.00m,
+            contractSpeedRefundPercent = 0.00m,
+            messageResponseMinScore = 2.00m,
+            messageResponseRefundPercent = 0.00m,
+            rejectedFragmentsMaxCount = 0,
+            rejectedFragmentsRefundPercent = 0.00m
+        };
+    }
+
+    private static b_inquiry_contract_term MapContractTerms(InquiryContractTermsCreateDTO? dto, int inquiryId)
+    {
+        dto ??= new InquiryContractTermsCreateDTO();
+
+        return new b_inquiry_contract_term
+        {
+            fkInquiryId = inquiryId,
+            fragmentSpeedMinScore = dto.FragmentSpeedMinScore,
+            fragmentSpeedRefundPercent = dto.FragmentSpeedRefundPercent,
+            revisionCountMaxAverage = dto.RevisionCountMaxAverage,
+            revisionCountRefundPercent = dto.RevisionCountRefundPercent,
+            contractSpeedMinScore = dto.ContractSpeedMinScore,
+            contractSpeedRefundPercent = dto.ContractSpeedRefundPercent,
+            messageResponseMinScore = dto.MessageResponseMinScore,
+            messageResponseRefundPercent = dto.MessageResponseRefundPercent,
+            rejectedFragmentsMaxCount = dto.RejectedFragmentsMaxCount,
+            rejectedFragmentsRefundPercent = dto.RejectedFragmentsRefundPercent
+        };
+    }
+
+    private static string? ValidateContractTerms(InquiryContractTermsCreateDTO? dto)
+    {
+        if (dto == null) return "ContractTerms is required.";
+
+        if (dto.FragmentSpeedMinScore < 0 || dto.FragmentSpeedMinScore > 2) return "FragmentSpeedMinScore must be between 0 and 2.";
+        if (dto.RevisionCountMaxAverage < 0) return "RevisionCountMaxAverage must be 0 or greater.";
+        if (dto.ContractSpeedMinScore < 0 || dto.ContractSpeedMinScore > 2) return "ContractSpeedMinScore must be between 0 and 2.";
+        if (dto.MessageResponseMinScore < 0 || dto.MessageResponseMinScore > 2) return "MessageResponseMinScore must be between 0 and 2.";
+        if (dto.RejectedFragmentsMaxCount < 0) return "RejectedFragmentsMaxCount must be 0 or greater.";
+
+        var refundPercents = new[]
+        {
+            dto.FragmentSpeedRefundPercent,
+            dto.RevisionCountRefundPercent,
+            dto.ContractSpeedRefundPercent,
+            dto.MessageResponseRefundPercent,
+            dto.RejectedFragmentsRefundPercent
+        };
+
+        if (refundPercents.Any(x => x < 0 || x > 100))
+            return "Refund percents must be between 0 and 100.";
+
+        return null;
+    }
 
     private async Task<DateTime?> GetMilestoneDeadline(int? requirementId, CancellationToken ct)
     {
@@ -989,10 +1154,15 @@ namespace BlokuGrandiniuSistema.Controllers;
     }
 
     private static string BuildApprovalReason(
+        int rejectedCountForMilestone,
         bool isLateForRequirement,
         bool isLateForContractEnd,
-        bool tooManyAttempts,
-        int submissionCount)
+        bool isLowFragmentSpeed,
+        bool isHighRevisionCount,
+        bool isLowContractSpeed,
+        bool isLowMessageResponse,
+        bool hasTooManyRejectedFragments,
+        decimal appliedRefundPercent)
     {
         var reasons = new List<string>();
 
@@ -1002,12 +1172,45 @@ namespace BlokuGrandiniuSistema.Controllers;
         if (isLateForContractEnd)
             reasons.Add("last fragment was submitted after contract deadline");
 
-        if (tooManyAttempts)
-            reasons.Add($"submission count exceeded limit ({submissionCount} > 3)");
+        if (isLowFragmentSpeed)
+            reasons.Add("fragment speed score was below the agreed threshold");
+
+        if (isHighRevisionCount)
+            reasons.Add($"rejected fragments for this milestone exceeded the agreed threshold ({rejectedCountForMilestone})");
+
+        if (isLowContractSpeed)
+            reasons.Add("delivery was late");
+
+        if (isLowMessageResponse)
+            reasons.Add("message response score was below the agreed threshold");
+
+        if (hasTooManyRejectedFragments)
+            reasons.Add("rejected fragments exceeded the agreed threshold");
 
         if (reasons.Count == 0)
             return "Approved with full payout.";
 
-        return "Approved with partial payout because " + string.Join("; ", reasons) + ".";
+        return $"Approved with partial payout ({appliedRefundPercent.ToString("0.##", CultureInfo.InvariantCulture)}% refund) because " + string.Join("; ", reasons) + ".";
+    }
+
+    private sealed class SettlementDecision
+    {
+        public decimal FullAmountEth { get; set; }
+        public decimal ProviderAmountEth { get; set; }
+        public decimal ClientRefundAmountEth { get; set; }
+        public bool WasPartial { get; set; }
+        public decimal AppliedRefundPercent { get; set; }
+        public int SubmissionCount { get; set; }
+        public int RejectedCountForMilestone { get; set; }
+        public bool IsLateForRequirement { get; set; }
+        public bool IsLateForContractEnd { get; set; }
+        public bool TooManyAttempts { get; set; }
+        public bool IsLowFragmentSpeed { get; set; }
+        public bool IsHighRevisionCount { get; set; }
+        public bool IsLowContractSpeed { get; set; }
+        public bool IsLowMessageResponse { get; set; }
+        public bool HasTooManyRejectedFragments { get; set; }
+        public int DelayInDays { get; set; }
+        public string Reason { get; set; } = "";
     }
 }

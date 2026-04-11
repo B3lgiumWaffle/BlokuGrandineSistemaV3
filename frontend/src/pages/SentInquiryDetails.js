@@ -70,6 +70,7 @@ function getInquiryStatusMeta(status, isConfirmed) {
 function normalize(raw) {
     const x = raw?.item ?? raw?.data ?? raw ?? {};
     const reqs = x.requirements ?? x.Requirements ?? [];
+    const terms = x.contractTerms ?? x.ContractTerms ?? null;
 
     return {
         inquiryId: x.inquiryId ?? x.InquiryId ?? x.id,
@@ -87,12 +88,32 @@ function normalize(raw) {
             description: r.description ?? r.Description ?? "",
             fileUrl: r.fileUrl ?? r.FileUrl ?? null,
             forseenCompletionDate: r.forseenCompletionDate ?? r.ForseenCompletionDate ?? ""
-        }))
+        })),
+        contractTerms: terms ? {
+            fragmentSpeedMinScore: terms.fragmentSpeedMinScore ?? terms.FragmentSpeedMinScore ?? null,
+            fragmentSpeedRefundPercent: terms.fragmentSpeedRefundPercent ?? terms.FragmentSpeedRefundPercent ?? null,
+            revisionCountMaxAverage: terms.revisionCountMaxAverage ?? terms.RevisionCountMaxAverage ?? null,
+            revisionCountRefundPercent: terms.revisionCountRefundPercent ?? terms.RevisionCountRefundPercent ?? null,
+            contractSpeedMinScore: terms.contractSpeedMinScore ?? terms.ContractSpeedMinScore ?? null,
+            contractSpeedRefundPercent: terms.contractSpeedRefundPercent ?? terms.ContractSpeedRefundPercent ?? null,
+            messageResponseMinScore: terms.messageResponseMinScore ?? terms.MessageResponseMinScore ?? null,
+            messageResponseRefundPercent: terms.messageResponseRefundPercent ?? terms.MessageResponseRefundPercent ?? null,
+            rejectedFragmentsMaxCount: terms.rejectedFragmentsMaxCount ?? terms.RejectedFragmentsMaxCount ?? null,
+            rejectedFragmentsRefundPercent: terms.rejectedFragmentsRefundPercent ?? terms.RejectedFragmentsRefundPercent ?? null,
+        } : null
     };
 }
 
 function newReq() {
     return { requirementId: null, description: "", forseenCompletionDate: "", existingFileUrl: null, file: null };
+}
+
+function defaultDraftTerms() {
+    return {
+        revisionCountMaxAverage: "3",
+        revisionCountRefundPercent: "0",
+        contractSpeedRefundPercent: "0",
+    };
 }
 
 export default function SentInquiryDetails() {
@@ -108,6 +129,7 @@ export default function SentInquiryDetails() {
     const [draftPrice, setDraftPrice] = useState("");
     const [draftDesc, setDraftDesc] = useState("");
     const [draftReqs, setDraftReqs] = useState([newReq()]);
+    const [draftTerms, setDraftTerms] = useState(defaultDraftTerms());
     const [saving, setSaving] = useState(false);
 
     const statusMeta = getInquiryStatusMeta(item?.status, item?.isConfirmed);
@@ -128,6 +150,11 @@ export default function SentInquiryDetails() {
                 file: null
             }))
         );
+        setDraftTerms({
+            revisionCountMaxAverage: String(n.contractTerms?.revisionCountMaxAverage ?? 3),
+            revisionCountRefundPercent: String(n.contractTerms?.revisionCountRefundPercent ?? 0),
+            contractSpeedRefundPercent: String(n.contractTerms?.contractSpeedRefundPercent ?? 0),
+        });
 
         if (n.lastModifiedBy === "OWNER" && !n.senderSeen) {
             await apiPostNoBody(`/api/inquiries/${id}/seen-sender`);
@@ -209,6 +236,11 @@ export default function SentInquiryDetails() {
                     file: null
                 }))
             );
+            setDraftTerms({
+                revisionCountMaxAverage: String(item.contractTerms?.revisionCountMaxAverage ?? 3),
+                revisionCountRefundPercent: String(item.contractTerms?.revisionCountRefundPercent ?? 0),
+                contractSpeedRefundPercent: String(item.contractTerms?.contractSpeedRefundPercent ?? 0),
+            });
         }
     };
 
@@ -238,6 +270,16 @@ export default function SentInquiryDetails() {
             }
 
             fd.append("Description", draftDesc ?? "");
+            fd.append("ContractTerms.FragmentSpeedMinScore", "2");
+            fd.append("ContractTerms.FragmentSpeedRefundPercent", "0");
+            fd.append("ContractTerms.RevisionCountMaxAverage", String(draftTerms.revisionCountMaxAverage || 3));
+            fd.append("ContractTerms.RevisionCountRefundPercent", String(draftTerms.revisionCountRefundPercent || 0));
+            fd.append("ContractTerms.ContractSpeedMinScore", "2");
+            fd.append("ContractTerms.ContractSpeedRefundPercent", String(draftTerms.contractSpeedRefundPercent || 0));
+            fd.append("ContractTerms.MessageResponseMinScore", "2");
+            fd.append("ContractTerms.MessageResponseRefundPercent", "0");
+            fd.append("ContractTerms.RejectedFragmentsMaxCount", "0");
+            fd.append("ContractTerms.RejectedFragmentsRefundPercent", "0");
 
             draftReqs.forEach((r, i) => {
                 if (r.requirementId != null) {
@@ -321,6 +363,18 @@ export default function SentInquiryDetails() {
                             </Typography>
 
                             <Divider sx={{ my: 2 }} />
+
+                            {item.contractTerms && (
+                                <>
+                                    <Typography sx={{ fontWeight: 900, mb: 1 }}>Refund rules</Typography>
+                                    <Stack spacing={1.2} sx={{ mb: 2 }}>
+                                        <Chip size="small" variant="outlined" label={`Same fragment submissions allowed: ${item.contractTerms.revisionCountMaxAverage}`} />
+                                        <Chip size="small" variant="outlined" label={`Refund if submission limit exceeded: ${item.contractTerms.revisionCountRefundPercent}%`} />
+                                        <Chip size="small" variant="outlined" label={`Refund if delivery is late: ${item.contractTerms.contractSpeedRefundPercent}%`} />
+                                    </Stack>
+                                    <Divider sx={{ my: 2 }} />
+                                </>
+                            )}
 
                             <Typography sx={{ fontWeight: 900, mb: 1 }}>Requirements</Typography>
 
@@ -414,6 +468,73 @@ export default function SentInquiryDetails() {
                                     />
                                 </Grid>
                             </Grid>
+
+                            <Divider sx={{ my: 2 }} />
+
+                            <Typography sx={{ fontWeight: 900, mb: 1 }}>Refund rules</Typography>
+                            <Stack spacing={1.5}>
+                                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
+                                    <Typography sx={{ fontWeight: 800, mb: 0.6 }}>
+                                        Fragment resubmission limit
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ opacity: 0.72, mb: 1.5 }}>
+                                        Decide how many times the same fragment can be submitted and what refund applies after that limit is exceeded.
+                                    </Typography>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12} md={6}>
+                                            <TextField
+                                                label="Max same fragment submissions"
+                                                value={draftTerms.revisionCountMaxAverage}
+                                                onChange={(e) => setDraftTerms((prev) => ({ ...prev, revisionCountMaxAverage: e.target.value }))}
+                                                fullWidth
+                                                type="number"
+                                                inputProps={{ min: 1, step: "1" }}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} md={6}>
+                                            <TextField
+                                                label="Refund if limit exceeded"
+                                                value={draftTerms.revisionCountRefundPercent}
+                                                onChange={(e) => setDraftTerms((prev) => ({ ...prev, revisionCountRefundPercent: e.target.value }))}
+                                                fullWidth
+                                                type="number"
+                                                inputProps={{ min: 0, max: 100, step: "0.01" }}
+                                                InputProps={{ startAdornment: <InputAdornment position="start">%</InputAdornment> }}
+                                            />
+                                        </Grid>
+                                    </Grid>
+                                </Paper>
+
+                                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
+                                    <Typography sx={{ fontWeight: 800, mb: 0.6 }}>
+                                        Late delivery refund
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ opacity: 0.72, mb: 1.5 }}>
+                                        Set the refund percentage applied if delivery misses the agreed milestone or final deadline.
+                                    </Typography>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12} md={6}>
+                                            <TextField
+                                                label="Deadline rule"
+                                                value="Hardcoded deadline rule"
+                                                fullWidth
+                                                InputProps={{ readOnly: true }}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} md={6}>
+                                            <TextField
+                                                label="Refund if delivery is late"
+                                                value={draftTerms.contractSpeedRefundPercent}
+                                                onChange={(e) => setDraftTerms((prev) => ({ ...prev, contractSpeedRefundPercent: e.target.value }))}
+                                                fullWidth
+                                                type="number"
+                                                inputProps={{ min: 0, max: 100, step: "0.01" }}
+                                                InputProps={{ startAdornment: <InputAdornment position="start">%</InputAdornment> }}
+                                            />
+                                        </Grid>
+                                    </Grid>
+                                </Paper>
+                            </Stack>
 
                             <Divider sx={{ my: 2 }} />
 

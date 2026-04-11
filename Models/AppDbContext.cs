@@ -34,6 +34,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<b_inquiry> b_inquiries { get; set; }
 
+    public virtual DbSet<b_inquiry_contract_term> b_inquiry_contract_terms { get; set; }
+
     public virtual DbSet<b_listing> b_listings { get; set; }
 
     public virtual DbSet<b_listing_photo> b_listing_photos { get; set; }
@@ -399,6 +401,45 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey(d => d.fk_userId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("fk_inquiry_user");
+        });
+
+        modelBuilder.Entity<b_inquiry_contract_term>(entity =>
+        {
+            entity.HasKey(e => e.inquiryContractTermsId).HasName("PRIMARY");
+
+            entity.HasIndex(e => e.fkInquiryId, "uq_b_inquiry_contract_terms_inquiry").IsUnique();
+
+            entity.Property(e => e.inquiryContractTermsId).HasColumnType("int(11)");
+            entity.Property(e => e.contractSpeedMinScore)
+                .HasPrecision(4, 2)
+                .HasDefaultValueSql("'2.00'");
+            entity.Property(e => e.contractSpeedRefundPercent).HasPrecision(5, 2);
+            entity.Property(e => e.createdAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.fkInquiryId).HasColumnType("int(11)");
+            entity.Property(e => e.fragmentSpeedMinScore)
+                .HasPrecision(4, 2)
+                .HasDefaultValueSql("'2.00'");
+            entity.Property(e => e.fragmentSpeedRefundPercent).HasPrecision(5, 2);
+            entity.Property(e => e.messageResponseMinScore)
+                .HasPrecision(4, 2)
+                .HasDefaultValueSql("'2.00'");
+            entity.Property(e => e.messageResponseRefundPercent).HasPrecision(5, 2);
+            entity.Property(e => e.rejectedFragmentsMaxCount).HasColumnType("int(11)");
+            entity.Property(e => e.rejectedFragmentsRefundPercent).HasPrecision(5, 2);
+            entity.Property(e => e.revisionCountMaxAverage)
+                .HasPrecision(4, 2)
+                .HasDefaultValueSql("'3.00'");
+            entity.Property(e => e.revisionCountRefundPercent).HasPrecision(5, 2);
+            entity.Property(e => e.updatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.fkInquiry).WithOne(p => p.b_inquiry_contract_term)
+                .HasForeignKey<b_inquiry_contract_term>(d => d.fkInquiryId)
+                .HasConstraintName("fk_b_inquiry_contract_terms_inquiry");
         });
 
         modelBuilder.Entity<b_listing>(entity =>

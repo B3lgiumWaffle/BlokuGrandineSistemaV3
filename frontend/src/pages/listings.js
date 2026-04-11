@@ -17,6 +17,10 @@ import {
     TextField,
     IconButton,
     InputAdornment,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -91,6 +95,36 @@ function newReq() {
     return { description: "", forseenCompletionDate: "", file: null };
 }
 
+function defaultContractTerms() {
+    return {
+        fragmentSpeedMinScore: "2",
+        fragmentSpeedRefundPercent: "0",
+        revisionCountMaxAverage: "3",
+        revisionCountRefundPercent: "0",
+        contractSpeedMinScore: "2",
+        contractSpeedRefundPercent: "0",
+        messageResponseMinScore: "2",
+        messageResponseRefundPercent: "0",
+        rejectedFragmentsMaxCount: "0",
+        rejectedFragmentsRefundPercent: "0",
+    };
+}
+
+function legacyContractTermsPreset() {
+    return {
+        fragmentSpeedMinScore: "2",
+        fragmentSpeedRefundPercent: "0",
+        revisionCountMaxAverage: "3",
+        revisionCountRefundPercent: "50",
+        contractSpeedMinScore: "2",
+        contractSpeedRefundPercent: "50",
+        messageResponseMinScore: "2",
+        messageResponseRefundPercent: "0",
+        rejectedFragmentsMaxCount: "0",
+        rejectedFragmentsRefundPercent: "0",
+    };
+}
+
 function InquiryModal({
     open,
     onClose,
@@ -108,12 +142,16 @@ function InquiryModal({
     const [proposedSum, setProposedSum] = useState("");
     const [description, setDescription] = useState("");
     const [requirements, setRequirements] = useState([newReq()]);
+    const [contractTerms, setContractTerms] = useState(defaultContractTerms());
+    const [contractTermsPreset, setContractTermsPreset] = useState("custom");
 
     useEffect(() => {
         if (open) {
             setProposedSum("");
             setDescription("");
             setRequirements([newReq()]);
+            setContractTerms(defaultContractTerms());
+            setContractTermsPreset("custom");
         }
     }, [open]);
 
@@ -127,11 +165,42 @@ function InquiryModal({
         );
     };
 
+    const setContractTermField = (field, value) => {
+        setContractTerms((prev) => ({ ...prev, [field]: value }));
+        setContractTermsPreset("custom");
+    };
+
+    const applyContractTermsPreset = (preset) => {
+        setContractTermsPreset(preset);
+
+        if (preset === "legacy") {
+            setContractTerms(legacyContractTermsPreset());
+            return;
+        }
+
+        if (preset === "empty") {
+            setContractTerms(defaultContractTerms());
+            return;
+        }
+    };
+
     const handleSubmit = () => {
         const payload = {
             fkListingId: Number(listingId),
             proposedSum: proposedSum === "" ? null : Number(proposedSum),
             description,
+            contractTerms: {
+                fragmentSpeedMinScore: Number(contractTerms.fragmentSpeedMinScore),
+                fragmentSpeedRefundPercent: Number(contractTerms.fragmentSpeedRefundPercent),
+                revisionCountMaxAverage: Number(contractTerms.revisionCountMaxAverage),
+                revisionCountRefundPercent: Number(contractTerms.revisionCountRefundPercent),
+                contractSpeedMinScore: Number(contractTerms.contractSpeedMinScore),
+                contractSpeedRefundPercent: Number(contractTerms.contractSpeedRefundPercent),
+                messageResponseMinScore: Number(contractTerms.messageResponseMinScore),
+                messageResponseRefundPercent: Number(contractTerms.messageResponseRefundPercent),
+                rejectedFragmentsMaxCount: Number(contractTerms.rejectedFragmentsMaxCount),
+                rejectedFragmentsRefundPercent: Number(contractTerms.rejectedFragmentsRefundPercent),
+            },
             requirements: requirements.map((r) => ({
                 description: r.description,
                 forseenCompletionDate: r.forseenCompletionDate || null,
@@ -147,6 +216,27 @@ function InquiryModal({
         listingId != null &&
         description.trim().length > 0 &&
         requirements.every((r) => r.description.trim().length > 0);
+
+    const contractTermRows = [
+        {
+            key: "revisionCount",
+            title: "Fragment resubmission limit",
+            description: "How many times the same fragment can be submitted before the payout is penalized.",
+            limitField: "revisionCountMaxAverage",
+            limitLabel: "Max submissions",
+            limitProps: { min: 1, step: "1" },
+            refundField: "revisionCountRefundPercent",
+        },
+        {
+            key: "lateDelivery",
+            title: "Late delivery refund",
+            description: "Refund applied if the provider delivers after the agreed requirement or final contract deadline.",
+            limitField: "contractSpeedMinScore",
+            limitLabel: "Rule",
+            limitProps: { min: 0, max: 2, step: "0.01" },
+            refundField: "contractSpeedRefundPercent",
+        },
+    ];
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -193,6 +283,125 @@ function InquiryModal({
                             />
                         </Grid>
                     </Grid>
+
+                    <Divider />
+
+                    <Box>
+                        <Stack
+                            direction={{ xs: "column", md: "row" }}
+                            spacing={2}
+                            alignItems={{ xs: "stretch", md: "center" }}
+                            justifyContent="space-between"
+                            sx={{ mb: 1.5 }}
+                        >
+                            <Box>
+                                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                    Contract terms
+                                </Typography>
+                                <Typography variant="body2" sx={{ opacity: 0.72 }}>
+                                    Configure each rule and the refund percent applied if it is violated.
+                                </Typography>
+                                <Typography variant="caption" sx={{ opacity: 0.62, display: "block", mt: 0.4 }}>
+                                    Message response remains a system rating metric and is not configurable here.
+                                </Typography>
+                            </Box>
+
+                            <FormControl size="small" sx={{ minWidth: { xs: "100%", md: 260 } }}>
+                                <InputLabel id="contract-terms-preset-label">Preset</InputLabel>
+                                <Select
+                                    labelId="contract-terms-preset-label"
+                                    label="Preset"
+                                    value={contractTermsPreset}
+                                    onChange={(e) => applyContractTermsPreset(e.target.value)}
+                                >
+                                    <MenuItem value="custom">Custom</MenuItem>
+                                    <MenuItem value="legacy">Legacy 50% rules</MenuItem>
+                                    <MenuItem value="empty">Empty / no penalties</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Stack>
+
+                        <Box
+                            sx={{
+                                border: "1px solid rgba(15,23,42,0.12)",
+                                borderRadius: 2,
+                                overflow: "hidden",
+                            }}
+                        >
+                            <Grid
+                                sx={{
+                                    px: 2,
+                                    py: 1.25,
+                                    bgcolor: "rgba(15,23,42,0.04)",
+                                    borderBottom: "1px solid rgba(15,23,42,0.08)",
+                                }}
+                            >
+                                <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: 0.3, display: "block" }}>
+                                    Set each rule value and the refund percent for that category.
+                                </Typography>
+                            </Grid>
+
+                            {contractTermRows.map((row, index) => (
+                                <Box
+                                    key={row.key}
+                                    sx={{
+                                        px: 2,
+                                        py: 2,
+                                    }}
+                                >
+                                    <Typography sx={{ fontWeight: 700, mb: 1.25 }}>
+                                        {row.title}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ opacity: 0.72, mb: 1.5 }}>
+                                        {row.description}
+                                    </Typography>
+
+                                    <Grid container spacing={1.5}>
+                                        <Grid item xs={12} md={6}>
+                                            {row.key === "lateDelivery" ?
+                                                (
+                                                <TextField
+                                                    label={row.limitLabel}
+                                                    value="Applid when late "
+                                                    fullWidth
+                                                    size="small"
+                                                    InputProps={{ readOnly: true }}
+                                                />
+                                            )
+                                                :
+                                                (
+                                                <TextField
+                                                    label={row.limitLabel}
+                                                    value={contractTerms[row.limitField]}
+                                                    onChange={(e) => setContractTermField(row.limitField, e.target.value)}
+                                                    fullWidth
+                                                    type="number"
+                                                    inputProps={row.limitProps}
+                                                    size="small"
+                                                />
+                                            )}
+                                        </Grid>
+                                        <Grid item xs={12} md={6}>
+                                            <TextField
+                                                label="Refund percent"
+                                                value={contractTerms[row.refundField]}
+                                                onChange={(e) => setContractTermField(row.refundField, e.target.value)}
+                                                fullWidth
+                                                type="number"
+                                                size="small"
+                                                inputProps={{ min: 0, max: 100, step: "0.01" }}
+                                                InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                                            />
+                                        </Grid>
+                                    </Grid>
+
+                                    {index !== contractTermRows.length - 1 && (
+                                        <Divider sx={{ mt: 2, borderColor: "rgba(15,23,42,0.08)" }} />
+                                    )}
+                                </Box>
+                            ))}
+                        </Box>
+                    </Box>
 
                     <Divider />
 
@@ -416,6 +625,16 @@ export default function Listing() {
             fd.append("FkListingId", String(payload.fkListingId));
             if (payload.proposedSum != null) fd.append("ProposedSum", String(payload.proposedSum));
             fd.append("Description", payload.description ?? "");
+            fd.append("ContractTerms.FragmentSpeedMinScore", String(payload.contractTerms.fragmentSpeedMinScore));
+            fd.append("ContractTerms.FragmentSpeedRefundPercent", String(payload.contractTerms.fragmentSpeedRefundPercent));
+            fd.append("ContractTerms.RevisionCountMaxAverage", String(payload.contractTerms.revisionCountMaxAverage));
+            fd.append("ContractTerms.RevisionCountRefundPercent", String(payload.contractTerms.revisionCountRefundPercent));
+            fd.append("ContractTerms.ContractSpeedMinScore", String(payload.contractTerms.contractSpeedMinScore));
+            fd.append("ContractTerms.ContractSpeedRefundPercent", String(payload.contractTerms.contractSpeedRefundPercent));
+            fd.append("ContractTerms.MessageResponseMinScore", String(payload.contractTerms.messageResponseMinScore));
+            fd.append("ContractTerms.MessageResponseRefundPercent", String(payload.contractTerms.messageResponseRefundPercent));
+            fd.append("ContractTerms.RejectedFragmentsMaxCount", String(payload.contractTerms.rejectedFragmentsMaxCount));
+            fd.append("ContractTerms.RejectedFragmentsRefundPercent", String(payload.contractTerms.rejectedFragmentsRefundPercent));
 
             (payload.requirements || []).forEach((r, i) => {
                 fd.append(`Requirements[${i}].Description`, r.description ?? "");

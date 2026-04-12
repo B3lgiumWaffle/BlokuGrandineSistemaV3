@@ -152,19 +152,34 @@ public class ListingsController : ControllerBase
             .AsNoTracking()
             .Where(l => l.isActivated == 1)
             .OrderByDescending(l => l.UploadTime)
+            .Join(
+                _db.b_users.AsNoTracking(),
+                listing => listing.userId,
+                user => user.UserId,
+                (listing, user) => new
+                {
+                    Listing = listing,
+                    Owner = user
+                }
+            )
             .Select(l => new
             {
-                listingId = l.listingId,
-                title = l.Title,
-                description = l.Description,
-                priceFrom = l.PriceFrom,
-                priceTo = l.PriceTo,
-                completionTime = l.CompletionTime,
-                uploadTime = l.UploadTime,
-                categoryId = l.CategoryId,
+                listingId = l.Listing.listingId,
+                title = l.Listing.Title,
+                description = l.Listing.Description,
+                priceFrom = l.Listing.PriceFrom,
+                priceTo = l.Listing.PriceTo,
+                completionTime = l.Listing.CompletionTime,
+                uploadTime = l.Listing.UploadTime,
+                categoryId = l.Listing.CategoryId,
+                ownerUserId = l.Owner.UserId,
+                ownerName = !string.IsNullOrWhiteSpace(l.Owner.Username)
+                    ? l.Owner.Username
+                    : ((l.Owner.firstname ?? "") + " " + (l.Owner.lastname ?? "")).Trim(),
+                ownerAvatarUrl = l.Owner.avatar,
 
                 photos = _db.b_listing_photos
-                    .Where(p => p.listingId == l.listingId)
+                    .Where(p => p.listingId == l.Listing.listingId)
                     .OrderByDescending(p => p.IsPrimary)
                     .ThenByDescending(p => p.UploadTime)
                     .Select(p => p.PhotoUrl)
@@ -192,6 +207,13 @@ public class ListingsController : ControllerBase
                 l.completionTime,
                 l.uploadTime,
                 l.categoryId,
+                l.ownerUserId,
+                ownerName = string.IsNullOrWhiteSpace(l.ownerName) ? $"Provider #{l.ownerUserId}" : l.ownerName,
+                ownerAvatarUrl = string.IsNullOrWhiteSpace(l.ownerAvatarUrl)
+                    ? null
+                    : (l.ownerAvatarUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                        ? l.ownerAvatarUrl
+                        : $"{baseUrl}{l.ownerAvatarUrl}"),
                 primaryPhotoUrl = primary,
                 thumbPhotoUrls = thumbs
             };

@@ -7,7 +7,9 @@ import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
 import CurrencyExchangeRoundedIcon from "@mui/icons-material/CurrencyExchangeRounded";
 import DatasetLinkedRoundedIcon from "@mui/icons-material/DatasetLinkedRounded";
+import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import { useNavigate } from "react-router-dom";
@@ -37,7 +39,110 @@ const timeAgo = (v) => {
 };
 const pick = (items, sorter, limit = 4, filter = () => true) => [...items].filter(filter).sort(sorter).slice(0, limit);
 
+function ListingImage({ src, alt, featured = false }) {
+    const [imageFailed, setImageFailed] = useState(false);
+    const hasImage = !!src && !imageFailed;
+
+    if (hasImage) {
+        return (
+            <Box
+                component="img"
+                src={src}
+                alt={alt}
+                onError={() => setImageFailed(true)}
+                sx={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover"
+                }}
+            />
+        );
+    }
+
+    return (
+        <Box
+            sx={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column",
+                gap: 1,
+                background: featured
+                    ? "linear-gradient(135deg, #d9fbe8 0%, #bbf7d0 45%, #dcfce7 100%)"
+                    : "linear-gradient(135deg, #e5f7ee 0%, #d1fae5 45%, #ecfdf5 100%)",
+                color: "#14532d"
+            }}
+        >
+            <Avatar
+                sx={{
+                    width: featured ? 72 : 60,
+                    height: featured ? 72 : 60,
+                    bgcolor: "rgba(20,83,45,0.10)",
+                    color: "#166534"
+                }}
+            >
+                <ImageRoundedIcon sx={{ fontSize: featured ? 34 : 28 }} />
+            </Avatar>
+            <Box sx={{ textAlign: "center", px: 2 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: featured ? 16 : 14 }}>
+                    No preview image
+                </Typography>
+                <Typography sx={{ fontSize: 12, opacity: 0.8 }}>
+                    This listing does not have uploaded photos yet.
+                </Typography>
+            </Box>
+        </Box>
+    );
+}
+
+function OwnerAvatar({ name, src }) {
+    const [imageFailed, setImageFailed] = useState(false);
+    const displayName = (name ?? "").trim();
+    const initials = displayName
+        ? displayName
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((part) => part.charAt(0).toUpperCase())
+            .join("")
+        : "";
+
+    if (src && !imageFailed) {
+        return (
+            <Avatar
+                src={src}
+                alt={displayName || "Provider"}
+                imgProps={{ onError: () => setImageFailed(true) }}
+                sx={{ width: 34, height: 34 }}
+            />
+        );
+    }
+
+    return (
+        <Avatar
+            sx={{
+                width: 34,
+                height: 34,
+                bgcolor: initials ? "#103d2b" : "#e5e7eb",
+                color: initials ? "#f0fdf4" : "#6b7280",
+                fontSize: 13,
+                fontWeight: 800
+            }}
+        >
+            {initials || <PersonRoundedIcon sx={{ fontSize: 18 }} />}
+        </Avatar>
+    );
+}
+
 function ListingCard({ item, navigate, featured = false }) {
+    const ownerName = item.ownerName || `Provider #${item.ownerUserId ?? "-"}`;
+    const mainMediaHeight = featured ? 260 : 220;
+    const thumbMediaHeight = featured ? 81 : 68;
+
     return (
         <Card sx={{
             height: "100%", borderRadius: 0, overflow: "hidden", border: "1px solid rgba(15,23,42,0.08)",
@@ -48,8 +153,22 @@ function ListingCard({ item, navigate, featured = false }) {
             <CardActionArea onClick={() => navigate(`/listing/${item.listingId}`)} sx={{ height: "100%" }}>
                 <Box sx={{ p: 1.5 }}>
                     <Box sx={{ display: "grid", gridTemplateColumns: item.thumbPhotoUrls?.length ? "1fr 84px" : "1fr", gap: 1, mb: 1.5 }}>
-                        <Box sx={{ position: "relative", overflow: "hidden", borderRadius: 0, minHeight: featured ? 260 : 220, bgcolor: "#dbe4df" }}>
-                            <Box component="img" src={item.primaryPhotoUrl || "/placeholder.jpg"} alt={item.title || "listing"} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                        <Box
+                            sx={{
+                                position: "relative",
+                                overflow: "hidden",
+                                borderRadius: 0,
+                                height: mainMediaHeight,
+                                minHeight: mainMediaHeight,
+                                maxHeight: mainMediaHeight,
+                                bgcolor: "#dbe4df"
+                            }}
+                        >
+                            <ListingImage
+                                src={item.primaryPhotoUrl}
+                                alt={item.title || "listing"}
+                                featured={featured}
+                            />
                             <Stack direction="row" spacing={1} sx={{ position: "absolute", top: 12, left: 12, right: 12, justifyContent: "space-between", zIndex: 1 }}>
                                 <Chip label={categoryLabel(item.categoryId)} sx={{ bgcolor: "rgba(255,255,255,0.88)", fontWeight: 700 }} />
                                 <Chip icon={<AccessTimeRoundedIcon sx={{ fontSize: 16 }} />} label={timeAgo(item.uploadTime)} sx={{ bgcolor: "rgba(15,23,42,0.76)", color: "white", "& .MuiChip-icon": { color: "white" } }} />
@@ -59,8 +178,34 @@ function ListingCard({ item, navigate, featured = false }) {
                         {item.thumbPhotoUrls?.length ? (
                             <Box sx={{ display: "grid", gridTemplateRows: "repeat(3, 1fr)", gap: 1 }}>
                                 {[0, 1, 2].map((idx) => item.thumbPhotoUrls[idx] ? (
-                                    <Box key={idx} component="img" src={item.thumbPhotoUrls[idx]} alt={`thumb-${idx}`} sx={{ width: "100%", height: "100%", minHeight: featured ? 81 : 68, objectFit: "cover", borderRadius: 0, bgcolor: "#dbe4df" }} />
-                                ) : <Box key={idx} sx={{ minHeight: featured ? 81 : 68, borderRadius: 0, bgcolor: "#e7ecea" }} />)}
+                                    <Box
+                                        key={idx}
+                                        component="img"
+                                        src={item.thumbPhotoUrls[idx]}
+                                        alt={`thumb-${idx}`}
+                                        sx={{
+                                            width: "100%",
+                                            height: thumbMediaHeight,
+                                            minHeight: thumbMediaHeight,
+                                            maxHeight: thumbMediaHeight,
+                                            objectFit: "cover",
+                                            borderRadius: 0,
+                                            bgcolor: "#dbe4df",
+                                            display: "block"
+                                        }}
+                                    />
+                                ) : (
+                                    <Box
+                                        key={idx}
+                                        sx={{
+                                            height: thumbMediaHeight,
+                                            minHeight: thumbMediaHeight,
+                                            maxHeight: thumbMediaHeight,
+                                            borderRadius: 0,
+                                            bgcolor: "#e7ecea"
+                                        }}
+                                    />
+                                ))}
                             </Box>
                         ) : null}
                     </Box>
@@ -68,9 +213,11 @@ function ListingCard({ item, navigate, featured = false }) {
                 <CardContent sx={{ pt: 0, px: 2.25, pb: "20px !important" }}>
                     <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
                         <Stack direction="row" spacing={1} alignItems="center">
-                            <Avatar sx={{ width: 34, height: 34, bgcolor: "#103d2b", fontSize: 13, fontWeight: 800 }}>{String(item.ownerUserId ?? "X").slice(-2)}</Avatar>
+                            <OwnerAvatar name={ownerName} src={item.ownerAvatarUrl} />
                             <Box>
-                                <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Provider #{item.ownerUserId ?? "-"}</Typography>
+                                <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                                    {ownerName}
+                                </Typography>
                                 <Typography sx={{ fontSize: 12, color: "text.secondary" }}>Marketplace listing</Typography>
                             </Box>
                         </Stack>

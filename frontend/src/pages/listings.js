@@ -24,6 +24,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiPostFormData } from "../api/api";
 
@@ -507,14 +508,16 @@ function InquiryModal({
 }
 
 function CommentAvatar({ username, avatar }) {
-    const firstLetter = (username ?? "U").trim().charAt(0).toUpperCase() || "U";
+    const [imageFailed, setImageFailed] = useState(false);
+    const hasAvatar = !!avatar && !imageFailed;
 
-    if (avatar) {
+    if (hasAvatar) {
         return (
             <Box
                 component="img"
                 src={avatar}
                 alt={username}
+                onError={() => setImageFailed(true)}
                 sx={{
                     width: 44,
                     height: 44,
@@ -532,17 +535,17 @@ function CommentAvatar({ username, avatar }) {
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
-                bgcolor: "#111827",
-                color: "#f9fafb",
+                bgcolor: "#e5e7eb",
+                color: "#6b7280",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontWeight: 800,
-                fontSize: 16,
+                border: "1px solid",
+                borderColor: "#d1d5db",
                 flex: "0 0 auto",
             }}
         >
-            {firstLetter}
+            <PersonRoundedIcon sx={{ fontSize: 24 }} />
         </Box>
     );
 }

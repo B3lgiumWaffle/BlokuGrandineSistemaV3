@@ -232,8 +232,6 @@ export default function ContractDetails() {
     const [ratingValue, setRatingValue] = useState(0);
     const [ratingComment, setRatingComment] = useState("");
 
-    const messagesBottomRef = useRef(null);
-
     const currentUserId = getCurrentUserIdFromToken();
 
     const isProvider = item && currentUserId === Number(item.providerUserId);
@@ -390,19 +388,13 @@ export default function ContractDetails() {
             return;
         }
 
+        window.scrollTo({ top: 0, behavior: "auto" });
         load();
         loadMessages();
         loadFragments();
         loadRating();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [contractId, token]);
-
-    useEffect(() => {
-        if (!messagesData) return;
-        setTimeout(() => {
-            messagesBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-        }, 100);
-    }, [messagesData]);
 
     const onSendMessage = async () => {
         const text = messageText.trim();
@@ -1284,7 +1276,6 @@ export default function ContractDetails() {
                                             );
                                         })
                                     )}
-                                    <div ref={messagesBottomRef} />
                                 </Stack>
                             </Paper>
 

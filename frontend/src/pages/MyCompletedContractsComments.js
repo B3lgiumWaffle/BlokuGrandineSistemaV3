@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/api";
+import { createDisplayNumberMap, formatContractLabel, formatStatusLabel, getDisplayNumber } from "../utils/displayNames";
 
 function dateText(v) {
     if (!v) return "—";
@@ -74,15 +75,19 @@ export default function MyCompletedContractsComments() {
 
         return items.filter((x) => {
             return (
-                String(x.contractId ?? "").includes(query) ||
-                String(x.listingId ?? "").includes(query) ||
                 (x.listingTitle ?? "").toLowerCase().includes(query) ||
                 (x.otherPartyName ?? "").toLowerCase().includes(query) ||
                 (x.status ?? "").toLowerCase().includes(query) ||
+                formatStatusLabel(x.status).toLowerCase().includes(query) ||
                 (x.commentText ?? "").toLowerCase().includes(query)
             );
         });
     }, [items, q]);
+
+    const contractDisplayNumbers = useMemo(
+        () => createDisplayNumberMap(items, (x) => x.contractId),
+        [items]
+    );
 
     const noCommentItems = useMemo(
         () => filtered.filter((x) => !x.hasComment),
@@ -103,7 +108,10 @@ export default function MyCompletedContractsComments() {
         navigate(`/contract-comments/${x.contractId}`);
     };
 
-    const renderContractCard = (x) => (
+    const renderContractCard = (x) => {
+        const displayNumber = getDisplayNumber(contractDisplayNumbers, x.contractId);
+
+        return (
         <Paper
             key={x.contractId}
             sx={{
@@ -118,10 +126,7 @@ export default function MyCompletedContractsComments() {
             <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                 <Box sx={{ minWidth: 0 }}>
                     <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2 }}>
-                        {x.listingTitle}
-                    </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                        Contract ID: {x.contractId ?? "—"} • Listing ID: {x.listingId ?? "—"}
+                        {formatContractLabel(x, displayNumber)}
                     </Typography>
                     <Typography variant="body2" sx={{ opacity: 0.75 }}>
                         {x.myRole} • Other party: {x.otherPartyName || "—"}
@@ -129,7 +134,7 @@ export default function MyCompletedContractsComments() {
                 </Box>
 
                 <Stack direction="row" spacing={1} sx={{ flex: "0 0 auto" }}>
-                    <Chip label={x.status || "—"} color="success" variant="outlined" />
+                    <Chip label={formatStatusLabel(x.status)} color="success" variant="outlined" />
                     <Chip
                         label={x.hasComment ? "Comment written" : "Write comment"}
                         color={x.hasComment ? "success" : "primary"}
@@ -154,7 +159,8 @@ export default function MyCompletedContractsComments() {
                 </Typography>
             </Stack>
         </Paper>
-    );
+        );
+    };
 
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
@@ -173,7 +179,7 @@ export default function MyCompletedContractsComments() {
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     fullWidth
-                    label="Search by contract ID, listing, person, or comment"
+                    label="Search by contract, listing, person, or comment"
                 />
             </Paper>
 

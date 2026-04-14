@@ -11,6 +11,7 @@ import {
     Chip
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { createDisplayNumberMap, getDisplayNumber, getListingReviewStatusLabel } from "../utils/displayNames";
 
 const API_URL = "https://localhost:7278";
 
@@ -71,6 +72,11 @@ export default function ListingMonitoring() {
         );
     });
 
+    const listingDisplayNumbers = useMemo(
+        () => createDisplayNumberMap(items, (x) => x.listingId),
+        [items]
+    );
+
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
@@ -86,7 +92,7 @@ export default function ListingMonitoring() {
             <Paper sx={{ p: 2, borderRadius: 3, mb: 2 }}>
                 <TextField
                     fullWidth
-                    label="Search by listing ID, owner ID, title, description"
+                    label="Search by listing title or description"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                 />
@@ -107,7 +113,9 @@ export default function ListingMonitoring() {
                 </Paper>
             ) : (
                 <Stack spacing={2}>
-                    {filtered.map((x) => (
+                    {filtered.map((x) => {
+                        const displayNumber = getDisplayNumber(listingDisplayNumbers, x.listingId);
+                        return (
                         <Paper
                             key={x.listingId}
                             sx={{
@@ -122,10 +130,7 @@ export default function ListingMonitoring() {
                             <Stack direction="row" justifyContent="space-between" spacing={2}>
                                 <Box sx={{ minWidth: 0 }}>
                                     <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                                        {x.title}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                                        Listing ID: {x.listingId} • Owner ID: {x.ownerUserId}
+                                        Listing #{displayNumber ?? "—"} - {x.title}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.85, mt: 0.7 }}>
                                         {x.description || "No description"}
@@ -134,13 +139,14 @@ export default function ListingMonitoring() {
 
                                 <Stack alignItems="flex-end" spacing={1}>
                                     <Chip
-                                        label={x.isActivated ? "Approved" : "Pending / Rejected"}
+                                        label={getListingReviewStatusLabel(x.isActivated)}
                                         variant="outlined"
                                     />
                                 </Stack>
                             </Stack>
                         </Paper>
-                    ))}
+                        );
+                    })}
                 </Stack>
             )}
         </Container>

@@ -21,6 +21,7 @@ import {
     signAndFundProject,
     ESCROW_ADDRESS
 } from "../blockchain/escrow";
+import { createDisplayNumberMap, formatContractLabel, formatStatusLabel, getDisplayNumber } from "../utils/displayNames";
 
 const DEFAULT_ESCROW_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
@@ -231,6 +232,7 @@ export default function ContractDetails() {
     const [ratingData, setRatingData] = useState(null);
     const [ratingValue, setRatingValue] = useState(0);
     const [ratingComment, setRatingComment] = useState("");
+    const [displayNumber, setDisplayNumber] = useState(null);
 
     const currentUserId = getCurrentUserIdFromToken();
 
@@ -368,13 +370,21 @@ export default function ContractDetails() {
             setLoading(true);
             setErr("");
 
-            const [contractData, payloadData] = await Promise.all([
+            const [contractData, payloadData, myContractsData] = await Promise.all([
                 apiGet(`/api/contracts/${contractId}`),
-                apiGet(`/api/contracts/${contractId}/blockchain-payload`)
+                apiGet(`/api/contracts/${contractId}/blockchain-payload`),
+                apiGet("/api/contracts/my"),
             ]);
 
-            setItem(normalizeContract(contractData));
+            const normalizedContract = normalizeContract(contractData);
+            setItem(normalizedContract);
             setPayload(normalizePayload(payloadData));
+
+            const myContracts = Array.isArray(myContractsData)
+                ? myContractsData
+                : myContractsData?.items ?? myContractsData?.data ?? [];
+            const displayMap = createDisplayNumberMap(myContracts, (x) => x.contractId ?? x.ContractId);
+            setDisplayNumber(getDisplayNumber(displayMap, normalizedContract.contractId));
         } catch (e) {
             setErr(e?.message ?? "Failed to load contract");
         } finally {
@@ -727,7 +737,7 @@ export default function ContractDetails() {
                         </Box>
 
                         <Chip
-                            label={fragment.status || "Unknown"}
+                            label={formatStatusLabel(fragment.status, "fragment")}
                             color={getFragmentStatusColor(fragment.status)}
                             variant="filled"
                             sx={{ fontWeight: 800 }}
@@ -899,14 +909,11 @@ export default function ContractDetails() {
                 <Paper sx={{ p: 2.5, borderRadius: 3 }}>
                     <Stack spacing={1}>
                         <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                            Contract #{item.contractId}
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                            Inquiry ID: {item.inquiryId}
+                            {formatContractLabel(item, displayNumber)}
                         </Typography>
 
                         <Stack direction="row" spacing={1} flexWrap="wrap">
-                            <Chip label={`Status: ${item.status}`} color="primary" variant="outlined" />
+                            <Chip label={`Status: ${formatStatusLabel(item.status)}`} color="primary" variant="outlined" />
                             <Chip label={`Network: ${item.network || "localhost"}`} variant="outlined" />
                             <Chip label={`Amount: ${money(item.agreedAmountEur)}`} variant="outlined" />
                             <Chip label={`Funded: ${eth(item.fundedAmountEth)}`} variant="outlined" />
@@ -916,7 +923,7 @@ export default function ContractDetails() {
                             Smart contract: {item.smartContractAddress || ESCROW_ADDRESS || DEFAULT_ESCROW_ADDRESS}
                         </Typography>
                         <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                            Chain project ID: {item.chainProjectId ?? "—"}
+                            On-chain project: {item.chainProjectId != null ? "Created" : "Not created yet"}
                         </Typography>
                         <Typography variant="body2" sx={{ opacity: 0.8 }}>
                             Funding tx: {item.fundingTxHash || "—"}
@@ -978,7 +985,7 @@ export default function ContractDetails() {
                                             ETH amount: {eth(m.amountEth)}
                                         </Typography>
                                         <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                            Status: {m.status}
+                                            Status: {formatStatusLabel(m.status, "milestone")}
                                         </Typography>
                                         <Typography variant="body2" sx={{ opacity: 0.75 }}>
                                             Release tx: {m.releaseTxHash || "—"}
@@ -1254,7 +1261,7 @@ export default function ContractDetails() {
                                                                 fontWeight: 800
                                                             }}
                                                         >
-                                                            {isMine ? "You" : (m.senderName || `User #${m.senderUserId}`)}
+                                                            {isMine ? "You" : (m.senderName || "Other participant")}
                                                         </Typography>
 
                                                         <Typography

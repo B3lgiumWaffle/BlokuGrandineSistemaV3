@@ -13,6 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/api";
 import { BackButton, EmptyState, PageHero, PageShell, SectionCard } from "../components/PageChrome";
+import { createDisplayNumberMap, formatContractLabel, formatStatusLabel, getDisplayNumber } from "../utils/displayNames";
 
 function normalizeContracts(raw) {
     const data = Array.isArray(raw) ? raw : raw?.items ?? raw?.data ?? [];
@@ -59,12 +60,6 @@ function dateText(v) {
     const d = new Date(v);
     if (Number.isNaN(d.getTime())) return "—";
     return d.toLocaleDateString();
-}
-
-function shortText(s, max = 70) {
-    const t = (s ?? "").trim();
-    if (!t) return "—";
-    return t.length > max ? t.slice(0, max) + "…" : t;
 }
 
 function statusColor(status) {
@@ -147,9 +142,8 @@ export default function MyContracts() {
 
         return items.filter((x) => {
             return (
-                String(x.contractId ?? "").includes(query) ||
-                String(x.inquiryId ?? "").includes(query) ||
                 (x.status ?? "").toLowerCase().includes(query) ||
+                formatStatusLabel(x.status).toLowerCase().includes(query) ||
                 (x.network ?? "").toLowerCase().includes(query) ||
                 (x.listingTitle ?? "").toLowerCase().includes(query) ||
                 (x.otherPartyName ?? "").toLowerCase().includes(query) ||
@@ -158,6 +152,11 @@ export default function MyContracts() {
             );
         });
     }, [items, q]);
+
+    const contractDisplayNumbers = useMemo(
+        () => createDisplayNumberMap(items, (x) => x.contractId),
+        [items]
+    );
 
     const grouped = useMemo(() => {
         const base = {
@@ -206,7 +205,10 @@ export default function MyContracts() {
         }));
     };
 
-    const renderContractCard = (x) => (
+    const renderContractCard = (x) => {
+        const displayNumber = getDisplayNumber(contractDisplayNumbers, x.contractId);
+
+        return (
         <Paper
             key={x.contractId}
             variant="outlined"
@@ -222,15 +224,11 @@ export default function MyContracts() {
             <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
                 <Box sx={{ minWidth: 0 }}>
                     <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2 }}>
-                        Contract #{x.contractId}
-                    </Typography>
-
-                    <Typography variant="body2" sx={{ opacity: 0.75, mt: 0.3 }}>
-                        Listing: {shortText(x.listingTitle, 90)}
+                        {formatContractLabel(x, displayNumber)}
                     </Typography>
 
                     <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                        Inquiry ID: {x.inquiryId ?? "—"} • Role: {x.myRole || "—"}
+                        Role: {x.myRole || "—"}
                     </Typography>
 
                     <Typography variant="body2" sx={{ opacity: 0.75 }}>
@@ -240,7 +238,7 @@ export default function MyContracts() {
 
                 <Stack alignItems="flex-end" spacing={0.7} sx={{ flex: "0 0 auto" }}>
                     <Chip
-                        label={x.status || "Unknown"}
+                        label={formatStatusLabel(x.status)}
                         color={statusColor(x.status)}
                         variant="outlined"
                     />
@@ -265,7 +263,8 @@ export default function MyContracts() {
                 />
             </Stack>
         </Paper>
-    );
+        );
+    };
 
     return (
         <PageShell
@@ -292,7 +291,7 @@ export default function MyContracts() {
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     fullWidth
-                    label="Search by contract ID, inquiry ID, listing, status, network, or amount"
+                    label="Search by contract, listing, status, network, or amount"
                 />
             </SectionCard>
 

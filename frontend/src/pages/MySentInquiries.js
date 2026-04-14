@@ -13,6 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/api";
 import { BackButton, EmptyState, PageHero, PageShell, SectionCard } from "../components/PageChrome";
+import { createDisplayNumberMap, getDisplayNumber } from "../utils/displayNames";
 
 function normalize(raw) {
     const data = Array.isArray(raw) ? raw : raw?.items ?? raw?.data ?? [];
@@ -89,12 +90,16 @@ export default function MySentInquiries() {
         if (!t) return items;
 
         return items.filter((x) => (
-            String(x.inquiryId).includes(t) ||
             (x.listingTitle || "").toLowerCase().includes(t) ||
             (x.description || "").toLowerCase().includes(t) ||
             money(x.proposedSum).toLowerCase().includes(t)
         ));
     }, [items, q]);
+
+    const inquiryDisplayNumbers = useMemo(
+        () => createDisplayNumberMap(items, (x) => x.inquiryId),
+        [items]
+    );
 
     const openItems = useMemo(
         () => filtered.filter((x) => !x.isConfirmed),
@@ -119,6 +124,7 @@ export default function MySentInquiries() {
     const renderInquiryCard = (x, variant = "open") => {
         const updated = x.lastModifiedBy === "OWNER" && !x.senderSeen && !x.isConfirmed;
         const isAccepted = variant === "accepted";
+        const displayNumber = getDisplayNumber(inquiryDisplayNumbers, x.inquiryId);
 
         return (
             <Paper
@@ -144,7 +150,7 @@ export default function MySentInquiries() {
                     <Box sx={{ minWidth: 0 }}>
                         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 0.6 }}>
                             <Typography sx={{ fontWeight: 900 }}>
-                                Inquiry #{x.inquiryId}
+                                Inquiry #{displayNumber ?? "—"}
                             </Typography>
                             <Chip
                                 size="small"
@@ -202,7 +208,7 @@ export default function MySentInquiries() {
             <SectionCard sx={{ mb: 2 }}>
                 <TextField
                     fullWidth
-                    label="Search by listing, description, price, or ID"
+                    label="Search by listing, description, or price"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                 />

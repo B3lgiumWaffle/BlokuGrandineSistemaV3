@@ -10,6 +10,7 @@ import {
     Typography
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { createDisplayNumberMap, getDisplayNumber } from "../utils/displayNames";
 
 const API_URL = "https://localhost:7278";
 
@@ -63,12 +64,16 @@ export default function UserProfileMonitoring() {
         if (!s) return true;
 
         return (
-            String(x.userId ?? "").includes(s) ||
             (x.username ?? "").toLowerCase().includes(s) ||
             (x.email ?? "").toLowerCase().includes(s) ||
             (x.role ?? "").toLowerCase().includes(s)
         );
     });
+
+    const userDisplayNumbers = useMemo(
+        () => createDisplayNumberMap(items, (x) => x.userId),
+        [items]
+    );
 
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
@@ -85,7 +90,7 @@ export default function UserProfileMonitoring() {
             <Paper sx={{ p: 2, borderRadius: 3, mb: 2 }}>
                 <TextField
                     fullWidth
-                    label="Search by user ID, username, email, role"
+                    label="Search by username, email, or role"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                 />
@@ -102,7 +107,9 @@ export default function UserProfileMonitoring() {
                 </Paper>
             ) : (
                 <Stack spacing={2}>
-                    {filtered.map((x) => (
+                    {filtered.map((x) => {
+                        const displayNumber = getDisplayNumber(userDisplayNumbers, x.userId);
+                        return (
                         <Paper
                             key={x.userId}
                             sx={{
@@ -115,10 +122,7 @@ export default function UserProfileMonitoring() {
                             onClick={() => navigate(`/admin/users/${x.userId}`)}
                         >
                             <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                                {x.username}
-                            </Typography>
-                            <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                                User ID: {x.userId}
+                                User #{displayNumber ?? "—"} - {x.username}
                             </Typography>
                             <Typography variant="body2" sx={{ opacity: 0.8 }}>
                                 Email: {x.email}
@@ -127,7 +131,8 @@ export default function UserProfileMonitoring() {
                                 Role: {x.role ?? "—"}
                             </Typography>
                         </Paper>
-                    ))}
+                        );
+                    })}
                 </Stack>
             )}
         </Container>

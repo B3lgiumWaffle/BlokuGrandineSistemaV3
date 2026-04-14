@@ -206,7 +206,7 @@ namespace BlokuGrandiniuSistema.Services
                 $"Revision count: {metrics.RevisionCountScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.RevisionCountReason} Agreed maximum average rejects per milestone: {(terms?.revisionCountMaxAverage ?? 3.00m).ToString(CultureInfo.InvariantCulture)}.",
                 $"Contract speed: {metrics.ContractSpeedScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.ContractSpeedReason} Agreed minimum: {(terms?.contractSpeedMinScore ?? 2.00m).ToString(CultureInfo.InvariantCulture)}.",
                 $"Message response: {metrics.MessageResponseScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.MessageResponseReason} Agreed minimum: {(terms?.messageResponseMinScore ?? 2.00m).ToString(CultureInfo.InvariantCulture)}.",
-                $"Rejected fragments: {metrics.RejectedFragmentsScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.RejectedFragmentsReason} Agreed maximum count: {(terms?.rejectedFragmentsMaxCount ?? 0).ToString(CultureInfo.InvariantCulture)}.",
+                $"Rejected fragments: {rejectedFragmentsScore.Score.ToString(CultureInfo.InvariantCulture)}/2 - {rejectedFragmentsScore.Reason} Rejected fragment count is {metrics.RejectedFragmentsCount}. Agreed maximum count: {(terms?.rejectedFragmentsMaxCount ?? 0).ToString(CultureInfo.InvariantCulture)}.",
                 $"Total: {totalPoints.ToString(CultureInfo.InvariantCulture)}/10",
                 $"Final system rating: {finalRating.ToString("0.00", CultureInfo.InvariantCulture)}/5.00"
             });

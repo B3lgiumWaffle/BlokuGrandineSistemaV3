@@ -114,7 +114,7 @@ function defaultContractTerms() {
 function legacyContractTermsPreset() {
     return {
         fragmentSpeedMinScore: "2",
-        fragmentSpeedRefundPercent: "0",
+        fragmentSpeedRefundPercent: "50",
         revisionCountMaxAverage: "3",
         revisionCountRefundPercent: "50",
         contractSpeedMinScore: "2",
@@ -220,21 +220,25 @@ function InquiryModal({
 
     const contractTermRows = [
         {
+            key: "fragmentLate",
+            title: "Late fragment refund",
+            description: "Refund applied when an individual fragment is submitted after its own milestone deadline.",
+            refundField: "fragmentSpeedRefundPercent",
+        },
+        {
             key: "revisionCount",
             title: "Fragment resubmission limit",
             description: "How many times the same fragment can be submitted before the payout is penalized.",
-            limitField: "revisionCountMaxAverage",
-            limitLabel: "Max submissions",
-            limitProps: { min: 1, step: "1" },
+            inputMode: "number",
+            valueField: "revisionCountMaxAverage",
+            valueLabel: "Max submissions",
+            valueProps: { min: 1, step: "1" },
             refundField: "revisionCountRefundPercent",
         },
         {
-            key: "lateDelivery",
-            title: "Late delivery refund",
-            description: "Refund applied if the provider delivers after the agreed requirement or final contract deadline.",
-            limitField: "contractSpeedMinScore",
-            limitLabel: "Rule",
-            limitProps: { min: 0, max: 2, step: "0.01" },
+            key: "contractLate",
+            title: "Late final delivery refund",
+            description: "Refund applied if the last fragment is submitted after the final contract deadline.",
             refundField: "contractSpeedRefundPercent",
         },
     ];
@@ -359,28 +363,20 @@ function InquiryModal({
 
                                     <Grid container spacing={1.5}>
                                         <Grid item xs={12} md={6}>
-                                            {row.key === "lateDelivery" ?
+                                            {row.valueField ?
                                                 (
                                                 <TextField
-                                                    label={row.limitLabel}
-                                                    value="Applid when late "
+                                                    label={row.valueLabel}
+                                                    value={contractTerms[row.valueField]}
+                                                    onChange={(e) => setContractTermField(row.valueField, e.target.value)}
                                                     fullWidth
+                                                    type={row.inputMode ?? "text"}
                                                     size="small"
-                                                    InputProps={{ readOnly: true }}
+                                                    inputProps={row.valueProps}
                                                 />
                                             )
                                                 :
-                                                (
-                                                <TextField
-                                                    label={row.limitLabel}
-                                                    value={contractTerms[row.limitField]}
-                                                    onChange={(e) => setContractTermField(row.limitField, e.target.value)}
-                                                    fullWidth
-                                                    type="number"
-                                                    inputProps={row.limitProps}
-                                                    size="small"
-                                                />
-                                            )}
+                                                null}
                                         </Grid>
                                         <Grid item xs={12} md={6}>
                                             <TextField
@@ -558,6 +554,7 @@ export default function Listing() {
     const [err, setErr] = useState("");
 
     const [listing, setListing] = useState(null);
+    const [categories, setCategories] = useState([]);
     const [photos, setPhotos] = useState([]);
     const [activePhoto, setActivePhoto] = useState(null);
 
@@ -572,9 +569,13 @@ export default function Listing() {
                 setLoading(true);
                 setErr("");
 
-                const l = await apiGet(`/api/BrowseListings/${id}`);
+                const [l, categoriesRes] = await Promise.all([
+                    apiGet(`/api/BrowseListings/${id}`),
+                    apiGet("/api/categories"),
+                ]);
                 if (!alive) return;
                 setListing(normalizeListing(l));
+                setCategories(Array.isArray(categoriesRes) ? categoriesRes : categoriesRes?.items ?? categoriesRes?.data ?? []);
 
                 let p = [];
                 try {
@@ -620,6 +621,14 @@ export default function Listing() {
         listing?.priceFrom != null || listing?.priceTo != null
             ? `€ ${listing?.priceFrom ?? "-"} – ${listing?.priceTo ?? "-"}`
             : "Price not set";
+    const categoryTitle = useMemo(() => {
+        const match = categories.find(
+            (category) =>
+                Number(category.categoryId ?? category.CategoryId) === Number(listing?.categoryId)
+        );
+
+        return match?.title ?? match?.Title ?? null;
+    }, [categories, listing?.categoryId]);
 
     const onInquirySubmit = async (payload) => {
         try {
@@ -705,8 +714,8 @@ export default function Listing() {
                                 </Typography>
 
                                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                                    {listing.categoryId != null ? (
-                                        <Chip size="small" label={`Category #${listing.categoryId}`} />
+                                    {categoryTitle ? (
+                                        <Chip size="small" label={categoryTitle} />
                                     ) : null}
 
                                     {listing.completionTime ? (
@@ -894,7 +903,7 @@ export default function Listing() {
 
                                         <Stack spacing={0.6} sx={{ opacity: 0.9 }}>
                                             <Typography variant="body2">
-                                                • Category: {listing.categoryId ?? "-"}
+                                                • Category: {categoryTitle || "-"}
                                             </Typography>
                                             <Typography variant="body2">
                                                 • Delivery: {listing.completionTime || "-"}

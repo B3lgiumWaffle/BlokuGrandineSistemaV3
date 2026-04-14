@@ -11,6 +11,7 @@ import {
     Typography
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
+import { createDisplayNumberMap, getDisplayNumber } from "../utils/displayNames";
 
 const API_URL = "https://localhost:7278";
 
@@ -25,27 +26,42 @@ export default function ListingMonitoringDetails() {
     const [item, setItem] = useState(null);
     const [photos, setPhotos] = useState([]);
     const [comment, setComment] = useState("");
+    const [displayNumber, setDisplayNumber] = useState(null);
 
     const load = async () => {
         try {
             setLoading(true);
             setErr("");
 
-            const res = await fetch(`${API_URL}/api/admin/listings/${listingId}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
+            const [listingRes, pendingRes] = await Promise.all([
+                fetch(`${API_URL}/api/admin/listings/${listingId}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }),
+                fetch(`${API_URL}/api/admin/listings/pending`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }),
+            ]);
 
-            if (!res.ok) {
-                const txt = await res.text().catch(() => "");
-                throw new Error(`${res.status} ${txt}`);
+            if (!listingRes.ok) {
+                const txt = await listingRes.text().catch(() => "");
+                throw new Error(`${listingRes.status} ${txt}`);
             }
 
-            const data = await res.json();
+            const data = await listingRes.json();
+            const pendingData = pendingRes.ok ? await pendingRes.json() : [];
             setItem(data?.item ?? null);
             setPhotos(Array.isArray(data?.photos) ? data.photos : []);
             setComment(data?.item?.adminComment ?? "");
+
+            const displayMap = createDisplayNumberMap(
+                Array.isArray(pendingData) ? pendingData : [],
+                (x) => x.listingId
+            );
+            setDisplayNumber(getDisplayNumber(displayMap, data?.item?.listingId ?? listingId));
         } catch (e) {
             setErr(e?.message ?? "Failed to load listing");
         } finally {
@@ -145,10 +161,8 @@ export default function ListingMonitoringDetails() {
                 <Paper sx={{ p: 2.5, borderRadius: 3 }}>
                     <Stack spacing={1}>
                         <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                            {item.title}
+                            Listing #{displayNumber ?? "—"} - {item.title}
                         </Typography>
-                        <Typography variant="body2">Listing ID: {item.listingId}</Typography>
-                        <Typography variant="body2">Owner ID: {item.ownerUserId}</Typography>
                         <Typography variant="body2">Price from: {item.priceFrom ?? "—"}</Typography>
                         <Typography variant="body2">Price to: {item.priceTo ?? "—"}</Typography>
                         <Typography variant="body2">Completion time: {item.completionTime ?? "—"}</Typography>

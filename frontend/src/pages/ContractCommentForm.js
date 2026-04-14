@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiPostJson } from "../api/api";
+import { createDisplayNumberMap, formatContractLabel, formatStatusLabel, getDisplayNumber } from "../utils/displayNames";
 
 function dateText(v) {
     if (!v) return "—";
@@ -30,6 +31,7 @@ export default function ContractCommentForm() {
     const [err, setErr] = useState("");
     const [data, setData] = useState(null);
     const [commentText, setCommentText] = useState("");
+    const [displayNumber, setDisplayNumber] = useState(null);
 
     useEffect(() => {
         if (!token) {
@@ -44,11 +46,20 @@ export default function ContractCommentForm() {
                 setLoading(true);
                 setErr("");
 
-                const res = await apiGet(`/api/comment/contract/${contractId}`);
+                const [res, contractsRes] = await Promise.all([
+                    apiGet(`/api/comment/contract/${contractId}`),
+                    apiGet("/api/comment/my-completed-contracts"),
+                ]);
                 if (!alive) return;
 
                 setData(res);
                 setCommentText(res?.commentText ?? "");
+
+                const contracts = Array.isArray(contractsRes)
+                    ? contractsRes
+                    : contractsRes?.items ?? contractsRes?.data ?? [];
+                const displayMap = createDisplayNumberMap(contracts, (x) => x.contractId);
+                setDisplayNumber(getDisplayNumber(displayMap, contractId));
             } catch (e) {
                 if (!alive) return;
                 setErr(e?.message ?? "Couldn't load contract");
@@ -126,15 +137,12 @@ export default function ContractCommentForm() {
                 <Stack spacing={2}>
                     <Box>
                         <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                            {data.listingTitle}
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                            Contract ID: {data.contractId} • Listing ID: {data.listingId}
+                            {formatContractLabel(data, displayNumber)}
                         </Typography>
                     </Box>
 
                     <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                        <Chip label={data.status || "—"} color="success" variant="outlined" />
+                        <Chip label={formatStatusLabel(data.status)} color="success" variant="outlined" />
                         <Chip label={data.myRole || "—"} variant="outlined" />
                         <Chip label={`Other party: ${data.otherPartyName || "—"}`} variant="outlined" />
                     </Stack>

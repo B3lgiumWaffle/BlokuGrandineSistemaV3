@@ -11,6 +11,7 @@ import {
     Chip
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
+import { createDisplayNumberMap, getDisplayNumber } from "../utils/displayNames";
 
 const API_URL = "https://localhost:7278";
 
@@ -30,6 +31,7 @@ export default function UserProfileMonitoringDetails() {
     const [err, setErr] = useState("");
     const [item, setItem] = useState(null);
     const [deleting, setDeleting] = useState(false);
+    const [displayNumber, setDisplayNumber] = useState(null);
 
     useEffect(() => {
         let alive = true;
@@ -39,20 +41,34 @@ export default function UserProfileMonitoringDetails() {
                 setLoading(true);
                 setErr("");
 
-                const res = await fetch(`${API_URL}/api/admin/users/${userId}`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                });
+                const [detailsRes, usersRes] = await Promise.all([
+                    fetch(`${API_URL}/api/admin/users/${userId}`, {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }),
+                    fetch(`${API_URL}/api/admin/users`, {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }),
+                ]);
 
-                if (!res.ok) {
-                    const txt = await res.text().catch(() => "");
-                    throw new Error(`${res.status} ${txt}`);
+                if (!detailsRes.ok) {
+                    const txt = await detailsRes.text().catch(() => "");
+                    throw new Error(`${detailsRes.status} ${txt}`);
                 }
 
-                const data = await res.json();
+                const data = await detailsRes.json();
+                const usersData = usersRes.ok ? await usersRes.json() : [];
                 if (!alive) return;
                 setItem(data);
+
+                const displayMap = createDisplayNumberMap(
+                    Array.isArray(usersData) ? usersData : [],
+                    (x) => x.userId
+                );
+                setDisplayNumber(getDisplayNumber(displayMap, data?.user?.userId ?? userId));
             } catch (e) {
                 if (!alive) return;
                 setErr(e?.message ?? "Failed to load user");
@@ -133,10 +149,9 @@ export default function UserProfileMonitoringDetails() {
             ) : (
                 <Paper sx={{ p: 2.5, borderRadius: 3 }}>
                     <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                        {item.user?.username}
+                        User #{displayNumber ?? "—"} - {item.user?.username}
                     </Typography>
 
-                    <Typography variant="body2">User ID: {item.user?.userId}</Typography>
                     <Typography variant="body2">Email: {item.user?.email}</Typography>
                     <Typography variant="body2">Role: {item.user?.role}</Typography>
 
@@ -203,10 +218,9 @@ export default function UserProfileMonitoringDetails() {
                                 <Typography variant="body2">No listings found.</Typography>
                             </Paper>
                         ) : (
-                            (item.listings ?? []).map((l) => (
+                            (item.listings ?? []).map((l, index) => (
                                 <Paper key={l.listingId} variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
-                                    <Typography sx={{ fontWeight: 800 }}>{l.title}</Typography>
-                                    <Typography variant="body2">Listing ID: {l.listingId}</Typography>
+                                    <Typography sx={{ fontWeight: 800 }}>Listing #{index + 1} - {l.title}</Typography>
                                     <Typography variant="body2">
                                         Uploaded: {l.uploadTime ? new Date(l.uploadTime).toLocaleString() : "—"}
                                     </Typography>

@@ -15,7 +15,6 @@ import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import { useNavigate } from "react-router-dom";
 
 const API_URL = "https://localhost:7278";
-const categoryNames = { 1: " Web Development", 2: " Design", 3: " Programming", 4: " Marketing", 5: " Blockchain", 6: " Data", 7:  "Mobile Apps" };
 const trustPoints = [
     { icon: <ShieldRoundedIcon sx={{ fontSize: 20 }} />, title: "Clearer agreements", text: "Listings, pricing, and timing are presented in a more trustworthy marketplace view." },
     { icon: <VerifiedRoundedIcon sx={{ fontSize: 20 }} />, title: "More professional discovery", text: "Clients can compare services faster through cleaner cards and stronger visual hierarchy." },
@@ -26,7 +25,6 @@ const eur = (v) => {
     const n = Number(v ?? 0);
     return Number.isFinite(n) ? `${n.toFixed(0)} €` : "-";
 };
-const categoryLabel = (id) => categoryNames[id] || "Digital Service";
 const timeAgo = (v) => {
     if (!v) return "Recently added";
     const d = new Date(v);
@@ -138,8 +136,8 @@ function OwnerAvatar({ name, src }) {
     );
 }
 
-function ListingCard({ item, navigate, featured = false }) {
-    const ownerName = item.ownerName || `Provider #${item.ownerUserId ?? "-"}`;
+function ListingCard({ item, navigate, categoryLabel, featured = false }) {
+    const ownerName = item.ownerName || "Service provider";
     const mainMediaHeight = featured ? 260 : 220;
     const thumbMediaHeight = featured ? 81 : 68;
 
@@ -236,7 +234,7 @@ function ListingCard({ item, navigate, featured = false }) {
     );
 }
 
-function Section({ title, subtitle, items, navigate, featured = false }) {
+function Section({ title, subtitle, items, navigate, categoryLabel, featured = false }) {
     if (!items.length) return null;
     return (
         <Box sx={{ mt: { xs: 6, md: 8 } }}>
@@ -250,7 +248,7 @@ function Section({ title, subtitle, items, navigate, featured = false }) {
             <Grid container spacing={2.5}>
                 {items.map((item) => (
                     <Grid item xs={12} md={featured ? 6 : 3} key={`${title}-${item.listingId}`}>
-                        <ListingCard item={item} navigate={navigate} featured={featured} />
+                        <ListingCard item={item} navigate={navigate} categoryLabel={categoryLabel} featured={featured} />
                     </Grid>
                 ))}
             </Grid>
@@ -262,24 +260,46 @@ export default function Work() {
     const navigate = useNavigate();
     const token = useMemo(() => localStorage.getItem("token"), []);
     const [items, setItems] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const authHeaders = useMemo(() => (token ? { Authorization: `Bearer ${token}` } : {}), [token]);
+    const categoryLabel = useMemo(() => {
+        const categoryMap = new Map(
+            categories.map((category) => [
+                Number(category.categoryId ?? category.CategoryId),
+                category.title ?? category.Title ?? "Digital Service"
+            ])
+        );
+
+        return (id) => categoryMap.get(Number(id)) || "Digital Service";
+    }, [categories]);
 
     useEffect(() => {
         let alive = true;
         (async () => {
             try {
                 setLoading(true);
-                const res = await fetch(`${API_URL}/api/listings`, { headers: { ...authHeaders } });
-                if (!res.ok) {
-                    const txt = await res.text().catch(() => "");
-                    throw new Error(`${res.status} ${txt}`);
+                const [listingsRes, categoriesRes] = await Promise.all([
+                    fetch(`${API_URL}/api/listings`, { headers: { ...authHeaders } }),
+                    fetch(`${API_URL}/api/categories`, { headers: { ...authHeaders } }),
+                ]);
+
+                if (!listingsRes.ok) {
+                    const txt = await listingsRes.text().catch(() => "");
+                    throw new Error(`${listingsRes.status} ${txt}`);
                 }
-                const data = await res.json().catch(() => []);
-                if (alive) setItems(Array.isArray(data) ? data : []);
+                const listingsData = await listingsRes.json().catch(() => []);
+                const categoriesData = categoriesRes.ok ? await categoriesRes.json().catch(() => []) : [];
+                if (alive) {
+                    setItems(Array.isArray(listingsData) ? listingsData : []);
+                    setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+                }
             } catch (e) {
                 console.error(e);
-                if (alive) setItems([]);
+                if (alive) {
+                    setItems([]);
+                    setCategories([]);
+                }
             } finally {
                 if (alive) setLoading(false);
             }
@@ -307,7 +327,7 @@ export default function Work() {
         const key = categoryLabel(item.categoryId);
         acc[key] = (acc[key] || 0) + 1;
         return acc;
-    }, {})).sort((a, b) => b[1] - a[1]).slice(0, 4), [activeItems]);
+    }, {})).sort((a, b) => b[1] - a[1]).slice(0, 4), [activeItems, categoryLabel]);
 
     return (
         <Box sx={{ background: "radial-gradient(circle at top left, rgba(27,186,120,0.18) 0%, rgba(27,186,120,0) 28%), linear-gradient(180deg, #f4fbf7 0%, #ffffff 26%, #f8fafc 100%)", py: { xs: 4, md: 6 } }}>
@@ -385,10 +405,10 @@ export default function Work() {
                     </Box>
                 ) : (
                     <>
-                        <Section title="Featured offers" subtitle="The strongest offers are highlighted first to create a more marketplace-like first impression." items={featuredListings} navigate={navigate} featured />
-                        <Section title="Newest work" subtitle="Fresh listings shown early so users immediately see the latest services added to the platform." items={freshListings} navigate={navigate} />
-                        <Section title="Quick turnaround" subtitle="Faster delivery options for users who want shorter timelines and a quicker start." items={fastListings} navigate={navigate} />
-                        <Section title="Budget-friendly picks" subtitle="Listings that are easier to compare for users starting with smaller budgets." items={budgetListings} navigate={navigate} />
+                        <Section title="Featured offers" subtitle="The strongest offers are highlighted first to create a more marketplace-like first impression." items={featuredListings} navigate={navigate} categoryLabel={categoryLabel} featured />
+                        <Section title="Newest work" subtitle="Fresh listings shown early so users immediately see the latest services added to the platform." items={freshListings} navigate={navigate} categoryLabel={categoryLabel} />
+                        <Section title="Quick turnaround" subtitle="Faster delivery options for users who want shorter timelines and a quicker start." items={fastListings} navigate={navigate} categoryLabel={categoryLabel} />
+                        <Section title="Budget-friendly picks" subtitle="Listings that are easier to compare for users starting with smaller budgets." items={budgetListings} navigate={navigate} categoryLabel={categoryLabel} />
                     </>
                 )}
             </Container>

@@ -13,6 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/api";
 import { BackButton, EmptyState, PageHero, PageShell, SectionCard } from "../components/PageChrome";
+import { createDisplayNumberMap, getDisplayNumber } from "../utils/displayNames";
 
 /**
  * Expected API shapes supported:
@@ -156,6 +157,11 @@ export default function MyInquiries() {
             .filter(Boolean);
     }, [groups, q]);
 
+    const inquiryDisplayNumbers = useMemo(() => {
+        const allInquiries = groups.flatMap((g) => g.inquiries ?? []);
+        return createDisplayNumberMap(allInquiries, (x) => x.inquiryId);
+    }, [groups]);
+
     const totalAccepted = useMemo(
         () => groups.reduce((sum, g) => sum + g.inquiries.filter((x) => x.isConfirmed).length, 0),
         [groups]
@@ -197,7 +203,7 @@ export default function MyInquiries() {
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     fullWidth
-                    label="Search by listing, description, price, or ID"
+                    label="Search by listing, description, or price"
                 />
             </SectionCard>
 
@@ -234,7 +240,7 @@ export default function MyInquiries() {
                                         {g.listingTitle}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                                        Listing ID: {g.listingId ?? "—"} • Open: {openInquiries.length} • Accepted: {acceptedInquiries.length}
+                                        Open: {openInquiries.length} • Accepted: {acceptedInquiries.length}
                                     </Typography>
                                 </Box>
 
@@ -266,6 +272,9 @@ export default function MyInquiries() {
                                         </Typography>
                                     </Paper>
                                 ) : openInquiries.map((x) => (
+                                    (() => {
+                                        const displayNumber = getDisplayNumber(inquiryDisplayNumbers, x.inquiryId);
+                                        return (
                                     <Paper
                                         key={x.inquiryId}
                                         variant="outlined"
@@ -283,7 +292,7 @@ export default function MyInquiries() {
                                         <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                                             <Box sx={{ minWidth: 0 }}>
                                                 <Typography sx={{ fontWeight: 900 }}>
-                                                    Inquiry #{x.inquiryId}
+                                                    Inquiry #{displayNumber ?? "—"}
                                                 </Typography>
                                                 <Typography variant="body2" sx={{ opacity: 0.85 }}>
                                                     {shortText(x.description, 120)}
@@ -301,6 +310,8 @@ export default function MyInquiries() {
                                             </Stack>
                                         </Stack>
                                     </Paper>
+                                        );
+                                    })()
                                 ))}
                             </Stack>
 
@@ -326,6 +337,9 @@ export default function MyInquiries() {
                                     {showAccepted && (
                                         <Stack spacing={1.1} sx={{ mt: 1.5 }}>
                                             {acceptedInquiries.map((x) => (
+                                                (() => {
+                                                    const displayNumber = getDisplayNumber(inquiryDisplayNumbers, x.inquiryId);
+                                                    return (
                                                 <Paper
                                                     key={x.inquiryId}
                                                     variant="outlined"
@@ -343,7 +357,7 @@ export default function MyInquiries() {
                                                     <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                                                         <Box sx={{ minWidth: 0 }}>
                                                             <Typography sx={{ fontWeight: 900 }}>
-                                                                Inquiry #{x.inquiryId}
+                                                                Inquiry #{displayNumber ?? "—"}
                                                             </Typography>
                                                             <Typography variant="body2" sx={{ opacity: 0.82 }}>
                                                                 {shortText(x.description, 120)}
@@ -361,6 +375,8 @@ export default function MyInquiries() {
                                                         </Stack>
                                                     </Stack>
                                                 </Paper>
+                                                    );
+                                                })()
                                             ))}
                                         </Stack>
                                     )}

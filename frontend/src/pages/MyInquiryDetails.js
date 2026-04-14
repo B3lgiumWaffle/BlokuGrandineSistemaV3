@@ -18,6 +18,7 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiDelete, apiPutFormData, apiPostNoBody, apiPost } from "../api/api";
+import { createDisplayNumberMap, getDisplayNumber, getInquiryStatusMeta } from "../utils/displayNames";
 
 const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";
 
@@ -33,40 +34,6 @@ function money(v) {
     const n = Number(v);
     if (Number.isNaN(n)) return "—";
     return `€${n.toFixed(2)}`;
-}
-
-function getInquiryStatusMeta(status, isConfirmed) {
-    const s = String(status ?? "").toUpperCase();
-
-    if (s === "ACCEPTED" || isConfirmed) {
-        return { label: "Accepted", color: "success", variant: "filled" };
-    }
-
-    if (s === "PENDING") {
-        return { label: "Pending", color: "default", variant: "outlined" };
-    }
-
-    if (s === "FUNDED") {
-        return { label: "Funded", color: "primary", variant: "filled" };
-    }
-
-    if (s === "IN_PROGRESS") {
-        return { label: "In Progress", color: "warning", variant: "filled" };
-    }
-
-    if (s === "COMPLETED") {
-        return { label: "Completed", color: "success", variant: "filled" };
-    }
-
-    if (s === "CANCELLED") {
-        return { label: "Cancelled", color: "error", variant: "outlined" };
-    }
-
-    return {
-        label: isConfirmed ? "Accepted" : "Pending",
-        color: isConfirmed ? "success" : "default",
-        variant: isConfirmed ? "filled" : "outlined",
-    };
 }
 
 function normalizeInquiry(raw) {
@@ -124,6 +91,7 @@ function newDraftReq() {
 
 function defaultDraftTerms() {
     return {
+        fragmentSpeedRefundPercent: "0",
         revisionCountMaxAverage: "3",
         revisionCountRefundPercent: "0",
         contractSpeedRefundPercent: "0",
@@ -145,6 +113,7 @@ export default function MyInquiryDetails() {
     const [draftReqs, setDraftReqs] = useState([]);
     const [draftTerms, setDraftTerms] = useState(defaultDraftTerms());
     const [saving, setSaving] = useState(false);
+    const [displayNumber, setDisplayNumber] = useState(null);
 
     const statusMeta = getInquiryStatusMeta(item?.status, item?.isConfirmed);
 
@@ -157,11 +126,27 @@ export default function MyInquiryDetails() {
             setLoading(true);
             setErr("");
 
-            const data = await apiGet(`/api/inquiries/${id}`);
+            const [data, groupedInquiries] = await Promise.all([
+                apiGet(`/api/inquiries/${id}`),
+                apiGet("/api/inquiries/for-my-listings"),
+            ]);
             if (!aliveRef.alive) return;
 
             const n = normalizeInquiry(data);
             setItem(n);
+
+            const groupsRaw = Array.isArray(groupedInquiries)
+                ? groupedInquiries
+                : groupedInquiries?.items ?? groupedInquiries?.data ?? [];
+            const flatInquiries = groupsRaw.flatMap((group) => {
+                const inquiries = group?.inquiries ?? group?.Inquiries ?? [];
+                return Array.isArray(inquiries) ? inquiries : [];
+            });
+            const displayMap = createDisplayNumberMap(
+                flatInquiries.map((x) => ({ inquiryId: x.inquiryId ?? x.InquiryId ?? x.id })),
+                (x) => x.inquiryId
+            );
+            setDisplayNumber(getDisplayNumber(displayMap, n.inquiryId));
 
             setDraftPrice(n.proposedSum ?? "");
             setDraftDesc(n.description ?? "");
@@ -175,6 +160,7 @@ export default function MyInquiryDetails() {
                 }))
             );
             setDraftTerms({
+                fragmentSpeedRefundPercent: String(n.contractTerms?.fragmentSpeedRefundPercent ?? 0),
                 revisionCountMaxAverage: String(n.contractTerms?.revisionCountMaxAverage ?? 3),
                 revisionCountRefundPercent: String(n.contractTerms?.revisionCountRefundPercent ?? 0),
                 contractSpeedRefundPercent: String(n.contractTerms?.contractSpeedRefundPercent ?? 0),
@@ -222,7 +208,7 @@ export default function MyInquiryDetails() {
     };
 
     const onDecline = async () => {
-        const ok = window.confirm(`Decline inquiry #${id}? This will delete it.`);
+        const ok = window.confirm(`Decline inquiry${displayNumber ? ` #${displayNumber}` : ""}? This will delete it.`);
         if (!ok) return;
 
         try {
@@ -253,6 +239,7 @@ export default function MyInquiryDetails() {
                 }))
             );
             setDraftTerms({
+                fragmentSpeedRefundPercent: String(item.contractTerms?.fragmentSpeedRefundPercent ?? 0),
                 revisionCountMaxAverage: String(item.contractTerms?.revisionCountMaxAverage ?? 3),
                 revisionCountRefundPercent: String(item.contractTerms?.revisionCountRefundPercent ?? 0),
                 contractSpeedRefundPercent: String(item.contractTerms?.contractSpeedRefundPercent ?? 0),
@@ -289,7 +276,7 @@ export default function MyInquiryDetails() {
             fd.append("Description", draftDesc ?? "");
             fd.append("ModifiedNote", "Updated requirements");
             fd.append("ContractTerms.FragmentSpeedMinScore", "2");
-            fd.append("ContractTerms.FragmentSpeedRefundPercent", "0");
+            fd.append("ContractTerms.FragmentSpeedRefundPercent", String(draftTerms.fragmentSpeedRefundPercent || 0));
             fd.append("ContractTerms.RevisionCountMaxAverage", String(draftTerms.revisionCountMaxAverage || 3));
             fd.append("ContractTerms.RevisionCountRefundPercent", String(draftTerms.revisionCountRefundPercent || 0));
             fd.append("ContractTerms.ContractSpeedMinScore", "2");
@@ -339,6 +326,7 @@ export default function MyInquiryDetails() {
                 }))
             );
             setDraftTerms({
+                fragmentSpeedRefundPercent: String(n.contractTerms?.fragmentSpeedRefundPercent ?? 0),
                 revisionCountMaxAverage: String(n.contractTerms?.revisionCountMaxAverage ?? 3),
                 revisionCountRefundPercent: String(n.contractTerms?.revisionCountRefundPercent ?? 0),
                 contractSpeedRefundPercent: String(n.contractTerms?.contractSpeedRefundPercent ?? 0),
@@ -391,10 +379,10 @@ export default function MyInquiryDetails() {
                     <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                         <Box>
                             <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                                Inquiry #{item.inquiryId}
+                                Inquiry #{displayNumber ?? "—"}
                             </Typography>
                             <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                                Listing ID: {item.fkListingId ?? "—"} • Created: {safeDate(item.creationDate)}
+                                Created: {safeDate(item.creationDate)}
                             </Typography>
                         </Box>
 
@@ -423,9 +411,10 @@ export default function MyInquiryDetails() {
                                 <>
                                     <Typography sx={{ fontWeight: 900, mb: 1 }}>Refund rules</Typography>
                                     <Stack spacing={1.2} sx={{ mb: 2 }}>
+                                        <Chip size="small" variant="outlined" label={`Refund if a fragment is late: ${item.contractTerms.fragmentSpeedRefundPercent}%`} />
                                         <Chip size="small" variant="outlined" label={`Same fragment submissions allowed: ${item.contractTerms.revisionCountMaxAverage}`} />
                                         <Chip size="small" variant="outlined" label={`Refund if submission limit exceeded: ${item.contractTerms.revisionCountRefundPercent}%`} />
-                                        <Chip size="small" variant="outlined" label={`Refund if delivery is late: ${item.contractTerms.contractSpeedRefundPercent}%`} />
+                                        <Chip size="small" variant="outlined" label={`Refund if final contract deadline is missed: ${item.contractTerms.contractSpeedRefundPercent}%`} />
                                     </Stack>
                                     <Divider sx={{ my: 2 }} />
                                 </>
@@ -439,11 +428,11 @@ export default function MyInquiryDetails() {
                                 </Typography>
                             ) : (
                                 <Stack spacing={1.2}>
-                                    {item.requirements.map((r) => (
+                                    {item.requirements.map((r, index) => (
                                         <Paper key={r.requirementId} variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
                                             <Stack spacing={0.6}>
                                                 <Typography sx={{ fontWeight: 800 }}>
-                                                    Requirement #{r.requirementId}
+                                                    Requirement #{index + 1}
                                                 </Typography>
 
                                                 <Typography sx={{ whiteSpace: "pre-wrap" }}>
@@ -539,6 +528,36 @@ export default function MyInquiryDetails() {
                             <Stack spacing={1.5}>
                                 <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
                                     <Typography sx={{ fontWeight: 800, mb: 0.6 }}>
+                                        Late fragment refund
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ opacity: 0.72, mb: 1.5 }}>
+                                        Set the refund percentage applied when any fragment is submitted after its own requirement deadline.
+                                    </Typography>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12} md={6}>
+                                            <TextField
+                                                label="Rule"
+                                                value="Applied when fragment milestone deadline is missed"
+                                                fullWidth
+                                                InputProps={{ readOnly: true }}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} md={6}>
+                                            <TextField
+                                                label="Refund if fragment is late"
+                                                value={draftTerms.fragmentSpeedRefundPercent}
+                                                onChange={(e) => setDraftTerms((prev) => ({ ...prev, fragmentSpeedRefundPercent: e.target.value }))}
+                                                fullWidth
+                                                type="number"
+                                                inputProps={{ min: 0, max: 100, step: "0.01" }}
+                                                InputProps={{ startAdornment: <InputAdornment position="start">%</InputAdornment> }}
+                                            />
+                                        </Grid>
+                                    </Grid>
+                                </Paper>
+
+                                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
+                                    <Typography sx={{ fontWeight: 800, mb: 0.6 }}>
                                         Fragment resubmission limit
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.72, mb: 1.5 }}>
@@ -571,23 +590,23 @@ export default function MyInquiryDetails() {
 
                                 <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
                                     <Typography sx={{ fontWeight: 800, mb: 0.6 }}>
-                                        Late delivery refund
+                                        Late final delivery refund
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.72, mb: 1.5 }}>
-                                        Set the refund percentage applied if delivery misses the agreed milestone or final deadline.
+                                        Set the refund percentage applied if the last fragment misses the final contract deadline.
                                     </Typography>
                                     <Grid container spacing={2}>
                                         <Grid item xs={12} md={6}>
                                             <TextField
                                                 label="Deadline rule"
-                                                value="Hardcoded deadline rule"
+                                                value="Applied when final contract deadline is missed"
                                                 fullWidth
                                                 InputProps={{ readOnly: true }}
                                             />
                                         </Grid>
                                         <Grid item xs={12} md={6}>
                                             <TextField
-                                                label="Refund if delivery is late"
+                                                label="Refund if final deadline is missed"
                                                 value={draftTerms.contractSpeedRefundPercent}
                                                 onChange={(e) => setDraftTerms((prev) => ({ ...prev, contractSpeedRefundPercent: e.target.value }))}
                                                 fullWidth

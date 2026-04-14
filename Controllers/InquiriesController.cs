@@ -999,14 +999,16 @@ namespace BlokuGrandiniuSistema.Controllers;
                 h.newStatus == "Rejected", ct);
 
         var isHighRevisionCount = rejectedCountForMilestone > terms.revisionCountMaxAverage;
-        var isLateDelivery = isLateForRequirement || isLateForContractEnd;
+        var isLowFragmentSpeed = isLateForRequirement;
+        var isLowContractSpeed = isLateForContractEnd;
         var isLowMessageResponse = false;
         var hasTooManyRejectedFragments = false;
 
         var appliedRefundPercent = new[]
         {
+            isLowFragmentSpeed ? terms.fragmentSpeedRefundPercent : 0m,
             isHighRevisionCount ? terms.revisionCountRefundPercent : 0m,
-            isLateDelivery ? terms.contractSpeedRefundPercent : 0m
+            isLowContractSpeed ? terms.contractSpeedRefundPercent : 0m
         }.DefaultIfEmpty(0m).Max();
 
         appliedRefundPercent = Math.Clamp(appliedRefundPercent, 0m, 100m);
@@ -1027,9 +1029,9 @@ namespace BlokuGrandiniuSistema.Controllers;
             IsLateForRequirement = isLateForRequirement,
             IsLateForContractEnd = isLateForContractEnd,
             TooManyAttempts = false,
-            IsLowFragmentSpeed = false,
+            IsLowFragmentSpeed = isLowFragmentSpeed,
             IsHighRevisionCount = isHighRevisionCount,
-            IsLowContractSpeed = isLateDelivery,
+            IsLowContractSpeed = isLowContractSpeed,
             IsLowMessageResponse = isLowMessageResponse,
             HasTooManyRejectedFragments = hasTooManyRejectedFragments,
             DelayInDays = CalculateDelayInDays(fragment.submittedAt, requirementDeadline),
@@ -1037,9 +1039,9 @@ namespace BlokuGrandiniuSistema.Controllers;
                 rejectedCountForMilestone,
                 isLateForRequirement,
                 isLateForContractEnd,
-                false,
+                isLowFragmentSpeed,
                 isHighRevisionCount,
-                isLateDelivery,
+                isLowContractSpeed,
                 isLowMessageResponse,
                 hasTooManyRejectedFragments,
                 appliedRefundPercent)

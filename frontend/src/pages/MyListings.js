@@ -15,10 +15,12 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/api";
+import { useAppDialog } from "../components/AppDialogProvider";
 import { BackButton, EmptyState, PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
 export default function MyListings() {
     const navigate = useNavigate();
+    const dialog = useAppDialog();
     const [loading, setLoading] = useState(true);
     const [items, setItems] = useState([]);
     const [err, setErr] = useState("");
@@ -62,7 +64,11 @@ export default function MyListings() {
             return;
         }
 
-        const confirmDelete = window.confirm("Are you sure you want to delete this listing");
+        const confirmDelete = await dialog.confirm({
+            title: "Delete listing?",
+            message: "Are you sure you want to delete this listing?",
+            confirmText: "Delete"
+        });
         if (!confirmDelete) return;
 
         try {
@@ -78,7 +84,7 @@ export default function MyListings() {
 
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Error: ${res.status} ${txt}`);
+                await dialog.alert({ variant: "error", title: "Delete failed", message: `Error: ${res.status} ${txt}` });
                 return;
             }
 
@@ -86,7 +92,7 @@ export default function MyListings() {
             setItems((prev) => prev.filter((x) => x.listingId !== listingId));
 
         } catch (err) {
-            alert("Server error at delete");
+            await dialog.alert({ variant: "error", title: "Delete failed", message: "Server error at delete" });
         }
     };
 

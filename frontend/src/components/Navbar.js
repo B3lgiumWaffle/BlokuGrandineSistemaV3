@@ -86,6 +86,8 @@ export default function Navbar({ user, onLogout }) {
             if (n.type === "ListingRejected") return navigate(`/my-listings/edit/${n.referenceId}`);
             if (n.type === "ListingApproved") return navigate("/my-listings");
             if (n.type === "contract_message") return navigate(`/contracts/${n.referenceId}`);
+            if (n.type === "contract_fragment_disputed") return navigate("/admin/disputes");
+            if (n.type?.startsWith("contract_fragment_dispute_")) return navigate(`/contracts/${n.referenceId}`);
             navigate("/my-profile");
         } catch (e) {
             console.error(e);
@@ -177,6 +179,8 @@ export default function Navbar({ user, onLogout }) {
                             {(userRole === "Admin" || userRole === "Seller") ? <MenuItem onClick={() => { setAnchorEl(null); navigate("/my-listings"); }}>My listings</MenuItem> : null}
                             {userRole === "Admin" ? <MenuItem onClick={() => { setAnchorEl(null); navigate("/admin/listings"); }}>Admin listings</MenuItem> : null}
                             {userRole === "Admin" ? <MenuItem onClick={() => { setAnchorEl(null); navigate("/admin/users"); }}>Admin users</MenuItem> : null}
+                            {userRole === "Admin" ? <MenuItem onClick={() => { setAnchorEl(null); navigate("/admin/disputes"); }}>Dispute resolution</MenuItem> : null}
+                            {userRole === "Admin" ? <MenuItem onClick={() => { setAnchorEl(null); navigate("/admin/categories"); }}>Add categories</MenuItem> : null}
                             <Divider />
                             <MenuItem onClick={() => { setAnchorEl(null); onLogout(); navigate("/"); }}>Sign out</MenuItem>
                         </Menu>

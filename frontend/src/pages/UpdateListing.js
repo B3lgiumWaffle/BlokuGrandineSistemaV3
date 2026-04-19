@@ -17,6 +17,7 @@ import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAppDialog } from "../components/AppDialogProvider";
 import { PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
 const API_URL = "https://localhost:7278";
@@ -24,6 +25,7 @@ const API_URL = "https://localhost:7278";
 export default function UpdateListing() {
     const navigate = useNavigate();
     const { id } = useParams();
+    const dialog = useAppDialog();
     const token = useMemo(() => localStorage.getItem("token"), []);
 
     const [categories, setCategories] = useState([]);
@@ -69,7 +71,7 @@ export default function UpdateListing() {
                 const res = await fetch(`${API_URL}/api/listings/${id}`, { headers: authHeaders });
                 if (!res.ok) {
                     const txt = await res.text().catch(() => "");
-                    alert(`Failed to load listing: ${res.status} ${txt}`);
+                    await dialog.alert({ variant: "error", title: "Listing load failed", message: `Failed to load listing: ${res.status} ${txt}` });
                     navigate("/my-listings");
                     return;
                 }
@@ -101,7 +103,7 @@ export default function UpdateListing() {
                 setLoading(false);
             } catch (e) {
                 console.error(e);
-                alert("Error while loading listing data.");
+                await dialog.alert({ variant: "error", title: "Listing load failed", message: "Error while loading listing data." });
                 navigate("/my-listings");
             }
         })();
@@ -199,17 +201,21 @@ export default function UpdateListing() {
             });
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Error: ${res.status} ${txt}`);
+                await dialog.alert({ variant: "error", title: "Primary photo update failed", message: `Error: ${res.status} ${txt}` });
                 return;
             }
             await refreshPhotos();
         } catch {
-            alert("Server error setting primary");
+            await dialog.alert({ variant: "error", title: "Primary photo update failed", message: "Server error setting primary" });
         }
     };
 
     const deleteExisting = async (photoId) => {
-        const ok = window.confirm("Delete this photo?");
+        const ok = await dialog.confirm({
+            title: "Delete this photo?",
+            message: "This action cannot be undone.",
+            confirmText: "Delete"
+        });
         if (!ok) return;
 
         try {
@@ -219,12 +225,12 @@ export default function UpdateListing() {
             });
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Error: ${res.status} ${txt}`);
+                await dialog.alert({ variant: "error", title: "Photo delete failed", message: `Error: ${res.status} ${txt}` });
                 return;
             }
             await refreshPhotos();
         } catch {
-            alert("Server error deleting photo");
+            await dialog.alert({ variant: "error", title: "Photo delete failed", message: "Server error deleting photo" });
         }
     };
 
@@ -233,7 +239,10 @@ export default function UpdateListing() {
     // ---------- SAVE LISTING ----------
     const onSave = async () => {
         if (!token) return navigate("/login");
-        if (!selectedCategory) return alert("Choose category");
+        if (!selectedCategory) {
+            await dialog.alert({ variant: "warning", title: "Category required", message: "Choose category" });
+            return;
+        }
 
         const categoryId = selectedCategory.categoryId ?? selectedCategory.CategoryId;
 
@@ -257,7 +266,7 @@ export default function UpdateListing() {
 
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Error: ${res.status} ${txt}`);
+                await dialog.alert({ variant: "error", title: "Listing update failed", message: `Error: ${res.status} ${txt}` });
                 return;
             }
 
@@ -266,7 +275,7 @@ export default function UpdateListing() {
             navigate("/my-listings");
         } catch (e) {
             console.error(e);
-            alert(`Couldn't save': ${e.message || e}`);
+            await dialog.alert({ variant: "error", title: "Listing update failed", message: `Couldn't save: ${e.message || e}` });
         } finally {
             setSaving(false);
         }

@@ -13,7 +13,7 @@ import {
     Rating
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiPostJson } from "../api/api";
+import { apiGet, apiPostJson, apiPostNoBody } from "../api/api";
 import {
     createOnChainProject,
     getCurrentWalletAddress,
@@ -21,6 +21,7 @@ import {
     signAndFundProject,
     ESCROW_ADDRESS
 } from "../blockchain/escrow";
+import { useAppDialog } from "../components/AppDialogProvider";
 import { createDisplayNumberMap, formatContractLabel, formatStatusLabel, getDisplayNumber } from "../utils/displayNames";
 
 const DEFAULT_ESCROW_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
@@ -151,6 +152,8 @@ function normalizeFragments(raw) {
                 submittedByUserId: f.submittedByUserId ?? f.SubmittedByUserId,
                 submittedAt: f.submittedAt ?? f.SubmittedAt,
                 status: f.status ?? f.Status ?? "",
+                isDisputed: f.isDisputed ?? f.IsDisputed ?? false,
+                rejectLocked: f.rejectLocked ?? f.RejectLocked ?? false,
                 reviewComment: f.reviewComment ?? f.ReviewComment ?? "",
                 approvedByUserId: f.approvedByUserId ?? f.ApprovedByUserId ?? null,
                 approvedAt: f.approvedAt ?? f.ApprovedAt ?? null,
@@ -203,6 +206,7 @@ function getCurrentUserIdFromToken() {
 export default function ContractDetails() {
     const { contractId } = useParams();
     const navigate = useNavigate();
+    const dialog = useAppDialog();
     const token = useMemo(() => localStorage.getItem("token"), []);
 
     const [loading, setLoading] = useState(true);
@@ -421,7 +425,7 @@ export default function ContractDetails() {
             await loadMessages();
         } catch (e) {
             console.error(e);
-            alert(e?.message ?? "Failed to send message");
+            await dialog.alert({ variant: "error", title: "Message failed", message: e?.message ?? "Failed to send message" });
         } finally {
             setMessagesBusy(false);
         }
@@ -453,11 +457,11 @@ export default function ContractDetails() {
                 chainProjectId: result.projectId
             });
 
-            alert("On-chain project created.");
+            await dialog.alert({ variant: "success", title: "On-chain project created", message: "The blockchain project was created successfully." });
             await Promise.all([load(), loadMessages(), loadFragments(), loadRating()]);
         } catch (e) {
             console.error(e);
-            alert(e?.message ?? "Failed to create on-chain project");
+            await dialog.alert({ variant: "error", title: "On-chain project failed", message: e?.message ?? "Failed to create on-chain project" });
         } finally {
             setBusy(false);
         }
@@ -479,11 +483,11 @@ export default function ContractDetails() {
                 fundingTxHash: result.txHash
             });
 
-            alert("Contract funded.");
+            await dialog.alert({ variant: "success", title: "Contract funded", message: "The contract was signed and funded successfully." });
             await Promise.all([load(), loadMessages(), loadFragments(), loadRating()]);
         } catch (e) {
             console.error(e);
-            alert(e?.message ?? "Funding failed");
+            await dialog.alert({ variant: "error", title: "Funding failed", message: e?.message ?? "Funding failed" });
         } finally {
             setBusy(false);
         }
@@ -493,7 +497,7 @@ export default function ContractDetails() {
         const formState = getSubmitForm(milestoneNo);
 
         if (!formState.title.trim()) {
-            alert("Fragment title is required.");
+            await dialog.alert({ variant: "warning", title: "Fragment title required", message: "Fragment title is required." });
             return;
         }
 
@@ -524,7 +528,7 @@ export default function ContractDetails() {
                 throw new Error(text || "Failed to submit fragment");
             }
 
-            alert("Fragment submitted successfully.");
+            await dialog.alert({ variant: "success", title: "Fragment submitted", message: "The fragment was submitted successfully." });
             setSubmitForms((prev) => ({
                 ...prev,
                 [milestoneNo]: { title: "", description: "", file: null }
@@ -533,7 +537,7 @@ export default function ContractDetails() {
             await Promise.all([load(), loadFragments(), loadMessages(), loadRating()]);
         } catch (e) {
             console.error(e);
-            alert(e?.message ?? "Failed to submit fragment");
+            await dialog.alert({ variant: "error", title: "Fragment submit failed", message: e?.message ?? "Failed to submit fragment" });
         } finally {
             setBusy(false);
         }
@@ -574,11 +578,11 @@ export default function ContractDetails() {
                 }
             );
 
-            alert("Fragment approved and settled on-chain.");
+            await dialog.alert({ variant: "success", title: "Fragment approved", message: "The fragment was approved and settled on-chain." });
             await Promise.all([load(), loadFragments(), loadMessages(), loadRating()]);
         } catch (e) {
             console.error(e);
-            alert(e?.message ?? "Failed to approve fragment");
+            await dialog.alert({ variant: "error", title: "Fragment approval failed", message: e?.message ?? "Failed to approve fragment" });
         } finally {
             setFragmentsBusy(false);
         }
@@ -595,11 +599,45 @@ export default function ContractDetails() {
                 }
             );
 
-            alert("Fragment rejected successfully.");
+            await dialog.alert({ variant: "success", title: "Fragment rejected", message: "The fragment was rejected successfully." });
             await Promise.all([load(), loadFragments(), loadMessages(), loadRating()]);
         } catch (e) {
             console.error(e);
-            alert(e?.message ?? "Failed to reject fragment");
+            await dialog.alert({ variant: "error", title: "Fragment rejection failed", message: e?.message ?? "Failed to reject fragment" });
+        } finally {
+            setFragmentsBusy(false);
+        }
+    };
+
+    const onAskAdministrator = async (fragment) => {
+        const confirmed = await dialog.confirm({
+            title: "Ask for administrator",
+            message: "Are you sure you want to open a dispute for this rejected fragment? Administrator will review this milestone and make the final decision.",
+            confirmText: "Ask administrator"
+        });
+
+        if (!confirmed) return;
+
+        try {
+            setFragmentsBusy(true);
+
+            await apiPostNoBody(
+                `/api/inquiries/contracts/${contractId}/fragments/${fragment.fragmentId}/ask-admin`
+            );
+
+            await dialog.alert({
+                variant: "success",
+                title: "Dispute opened",
+                message: "Administrator review was requested successfully."
+            });
+            await Promise.all([load(), loadFragments(), loadMessages(), loadRating()]);
+        } catch (e) {
+            console.error(e);
+            await dialog.alert({
+                variant: "error",
+                title: "Dispute request failed",
+                message: e?.message ?? "Failed to ask for administrator review"
+            });
         } finally {
             setFragmentsBusy(false);
         }
@@ -607,7 +645,7 @@ export default function ContractDetails() {
 
     const onSubmitRating = async () => {
         if (!ratingValue || ratingValue < 1 || ratingValue > 5) {
-            alert("Please select rating from 1 to 5.");
+            await dialog.alert({ variant: "warning", title: "Rating required", message: "Please select rating from 1 to 5." });
             return;
         }
 
@@ -619,11 +657,11 @@ export default function ContractDetails() {
                 userRatingComment: ratingComment?.trim() || ""
             });
 
-            alert("Rating submitted successfully.");
+            await dialog.alert({ variant: "success", title: "Rating submitted", message: "Your rating was submitted successfully." });
             await Promise.all([load(), loadRating()]);
         } catch (e) {
             console.error(e);
-            alert(e?.message ?? "Failed to submit rating");
+            await dialog.alert({ variant: "error", title: "Rating failed", message: e?.message ?? "Failed to submit rating" });
         } finally {
             setRatingBusy(false);
         }
@@ -658,6 +696,17 @@ export default function ContractDetails() {
         return fragment.status === "Submitted";
     };
 
+    const canClientRejectFragment = (fragment) => {
+        if (!canClientReviewFragment(fragment)) return false;
+        return !fragment.rejectLocked;
+    };
+
+    const canProviderAskAdmin = (fragment) => {
+        if (!isProvider) return false;
+        if (fragmentsBusy) return false;
+        return fragment.status === "Rejected";
+    };
+
     const resolveFileHref = (filePath) => {
         if (!filePath) return null;
         if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
@@ -667,6 +716,7 @@ export default function ContractDetails() {
     const getFragmentStatusColor = (status) => {
         if (status === "Approved" || status === "ApprovedPartial") return "success";
         if (status === "Rejected" || status === "UnderRevision") return "error";
+        if (status === "Disputed") return "info";
         if (status === "Submitted") return "warning";
         return "default";
     };
@@ -688,6 +738,14 @@ export default function ContractDetails() {
             };
         }
 
+        if (status === "Disputed") {
+            return {
+                headerBg: "#ecfeff",
+                cardBg: variant === "latest" ? "#f0fdff" : "#f7feff",
+                borderColor: "#67e8f9"
+            };
+        }
+
         if (status === "Submitted") {
             return {
                 headerBg: "#fffbeb",
@@ -705,6 +763,8 @@ export default function ContractDetails() {
 
     const renderFragmentCard = (fragment, variant = "latest") => {
         const canReview = canClientReviewFragment(fragment);
+        const canReject = canClientRejectFragment(fragment);
+        const canEscalate = canProviderAskAdmin(fragment);
         const fileHref = resolveFileHref(fragment.filePath);
         const statusStyles = getFragmentStatusStyles(fragment.status, variant);
 
@@ -817,6 +877,42 @@ export default function ContractDetails() {
                             </Typography>
                         </Box>
 
+                        {fragment.status === "Disputed" && (
+                            <Box
+                                sx={{
+                                    p: 1.15,
+                                    border: "1px solid",
+                                    borderColor: "rgba(8, 145, 178, 0.18)",
+                                    bgcolor: "rgba(236, 254, 255, 0.92)"
+                                }}
+                            >
+                                <Typography variant="caption" sx={{ display: "block", opacity: 0.7 }}>
+                                    Dispute status
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: "info.dark" }}>
+                                    Waiting for administrator decision.
+                                </Typography>
+                            </Box>
+                        )}
+
+                        {fragment.rejectLocked && (
+                            <Box
+                                sx={{
+                                    p: 1.15,
+                                    border: "1px solid",
+                                    borderColor: "rgba(34, 197, 94, 0.18)",
+                                    bgcolor: "rgba(240, 253, 244, 0.92)"
+                                }}
+                            >
+                                <Typography variant="caption" sx={{ display: "block", opacity: 0.7 }}>
+                                    Administrator decision
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: "success.dark" }}>
+                                    Administrator approved this fragment. You can approve it, but you can no longer reject it.
+                                </Typography>
+                            </Box>
+                        )}
+
                         <Box
                             sx={{
                                 p: 1.15,
@@ -852,15 +948,17 @@ export default function ContractDetails() {
                                     spacing={1}
                                     justifyContent="flex-end"
                                 >
-                                    <Button
-                                        variant="outlined"
-                                        color="error"
-                                        onClick={() => onRejectFragment(fragment)}
-                                        disabled={fragmentsBusy}
-                                        sx={{ fontWeight: 800 }}
-                                    >
-                                        {fragmentsBusy ? "Please wait..." : "Reject"}
-                                    </Button>
+                                    {canReject && (
+                                        <Button
+                                            variant="outlined"
+                                            color="error"
+                                            onClick={() => onRejectFragment(fragment)}
+                                            disabled={fragmentsBusy}
+                                            sx={{ fontWeight: 800 }}
+                                        >
+                                            {fragmentsBusy ? "Please wait..." : "Reject"}
+                                        </Button>
+                                    )}
 
                                     <Button
                                         variant="contained"
@@ -873,6 +971,20 @@ export default function ContractDetails() {
                                     </Button>
                                 </Stack>
                             </>
+                        )}
+
+                        {canEscalate && (
+                            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="flex-end">
+                                <Button
+                                    variant="contained"
+                                    color="info"
+                                    onClick={() => onAskAdministrator(fragment)}
+                                    disabled={fragmentsBusy}
+                                    sx={{ fontWeight: 800 }}
+                                >
+                                    {fragmentsBusy ? "Please wait..." : "Ask for administrator"}
+                                </Button>
+                            </Stack>
                         )}
                     </Stack>
                 </Box>

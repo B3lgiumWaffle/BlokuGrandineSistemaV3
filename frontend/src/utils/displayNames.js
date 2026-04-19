@@ -39,11 +39,13 @@ const STATUS_LABELS = {
         Pending: "Pending",
         Submitted: "Submitted",
         UnderRevision: "Under revision",
+        Disputed: "Disputed",
         Released: "Released",
         ReleasedPartial: "Partially released",
     },
     fragment: {
         Submitted: "Submitted",
+        Disputed: "Disputed",
         Rejected: "Rejected",
         Approved: "Approved",
         ApprovedPartial: "Approved with partial payout",

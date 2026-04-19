@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Alert, Box, Button, Grid, Link as MuiLink, Stack, TextField, Typography } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PageShell, SectionCard } from "../components/PageChrome";
 
 const API_URL = "https://localhost:7278";
 
 export default function Login({ onLogin }) {
+    const navigate = useNavigate();
     const [form, setForm] = useState({ usernameOrEmail: "", password: "" });
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
@@ -30,8 +31,7 @@ export default function Login({ onLogin }) {
             localStorage.setItem("token", data.token);
             localStorage.setItem("user", JSON.stringify(data.user));
             onLogin(data.user);
-            setSuccess(`Signed in as ${data.user.username} (${data.user.role}).`);
-            setForm({ usernameOrEmail: "", password: "" });
+            navigate("/");
         } catch {
             setError("Could not connect to the server.");
         }

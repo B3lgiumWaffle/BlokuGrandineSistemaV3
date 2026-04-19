@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import {
-    Avatar, Box, Button, Card, CardActionArea, CardContent, Chip, Container, Grid, Skeleton, Stack, Typography
+    Avatar, Box, Button, Card, CardActionArea, CardContent, Chip, Container, FormControl, Grid, InputAdornment, InputLabel, MenuItem, Select, Skeleton, Stack, TextField, Typography
 } from "@mui/material";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
@@ -10,6 +10,7 @@ import DatasetLinkedRoundedIcon from "@mui/icons-material/DatasetLinkedRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import { useNavigate } from "react-router-dom";
@@ -261,6 +262,8 @@ export default function Work() {
     const token = useMemo(() => localStorage.getItem("token"), []);
     const [items, setItems] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [searchText, setSearchText] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState("all");
     const [loading, setLoading] = useState(true);
     const authHeaders = useMemo(() => (token ? { Authorization: `Bearer ${token}` } : {}), [token]);
     const categoryLabel = useMemo(() => {
@@ -308,6 +311,28 @@ export default function Work() {
     }, [authHeaders]);
 
     const activeItems = useMemo(() => items.filter((item) => Number(item.isActivated ?? 1) === 1), [items]);
+    const normalizedSearch = searchText.trim().toLowerCase();
+    const filteredItems = useMemo(() => activeItems.filter((item) => {
+        const matchesCategory =
+            selectedCategory === "all" ||
+            String(item.categoryId ?? "") === String(selectedCategory);
+
+        if (!matchesCategory) return false;
+        if (!normalizedSearch) return true;
+
+        const searchableText = [
+            item.title,
+            item.description,
+            item.completionTime,
+            item.ownerName,
+            categoryLabel(item.categoryId)
+        ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+
+        return searchableText.includes(normalizedSearch);
+    }), [activeItems, categoryLabel, normalizedSearch, selectedCategory]);
     const stats = useMemo(() => {
         const averageBudget = activeItems.length ? Math.round(activeItems.reduce((sum, item) => sum + Number(item.priceTo ?? item.priceFrom ?? 0), 0) / activeItems.length) : 0;
         return [
@@ -328,6 +353,12 @@ export default function Work() {
         acc[key] = (acc[key] || 0) + 1;
         return acc;
     }, {})).sort((a, b) => b[1] - a[1]).slice(0, 4), [activeItems, categoryLabel]);
+    const hasActiveFilters = selectedCategory !== "all" || !!normalizedSearch;
+    const selectedCategoryLabel = selectedCategory === "all"
+        ? "All categories"
+        : (categories.find((category) => String(category.categoryId ?? category.CategoryId) === String(selectedCategory))?.title
+            ?? categories.find((category) => String(category.categoryId ?? category.CategoryId) === String(selectedCategory))?.Title
+            ?? "Selected category");
 
     return (
         <Box sx={{ background: "radial-gradient(circle at top left, rgba(27,186,120,0.18) 0%, rgba(27,186,120,0) 28%), linear-gradient(180deg, #f4fbf7 0%, #ffffff 26%, #f8fafc 100%)", py: { xs: 4, md: 6 } }}>
@@ -385,6 +416,88 @@ export default function Work() {
                     ))}
                 </Grid>
 
+                <Box
+                    sx={{
+                        mt: { xs: 4, md: 5 },
+                        p: { xs: 2, md: 2.5 },
+                        border: "1px solid rgba(16,61,43,0.08)",
+                        background: "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.96) 100%)",
+                        boxShadow: "0 16px 40px rgba(15,23,42,0.06)"
+                    }}
+                >
+                    <Stack
+                        direction={{ xs: "column", lg: "row" }}
+                        spacing={2}
+                        alignItems={{ xs: "stretch", lg: "center" }}
+                        justifyContent="space-between"
+                    >
+                        <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a" }}>
+                                Find the right listing faster
+                            </Typography>
+                            <Typography sx={{ mt: 0.75, color: "text.secondary", maxWidth: 720 }}>
+                                Search by title, description, provider, or delivery terms and narrow the marketplace by category.
+                            </Typography>
+                        </Box>
+
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ width: { xs: "100%", lg: "auto" } }}>
+                            <TextField
+                                value={searchText}
+                                onChange={(e) => setSearchText(e.target.value)}
+                                placeholder="Search listings"
+                                sx={{ minWidth: { xs: "100%", md: 320 } }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <SearchRoundedIcon sx={{ color: "text.secondary" }} />
+                                        </InputAdornment>
+                                    )
+                                }}
+                            />
+
+                            <FormControl sx={{ minWidth: { xs: "100%", md: 240 } }}>
+                                <InputLabel id="marketplace-category-filter-label">Category</InputLabel>
+                                <Select
+                                    labelId="marketplace-category-filter-label"
+                                    value={selectedCategory}
+                                    label="Category"
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                >
+                                    <MenuItem value="all">All categories</MenuItem>
+                                    {categories.map((category) => {
+                                        const value = String(category.categoryId ?? category.CategoryId);
+                                        const label = category.title ?? category.Title ?? "Category";
+                                        return (
+                                            <MenuItem key={value} value={value}>
+                                                {label}
+                                            </MenuItem>
+                                        );
+                                    })}
+                                </Select>
+                            </FormControl>
+                        </Stack>
+                    </Stack>
+
+                    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2, rowGap: 1 }}>
+                        <Chip
+                            label={`${filteredItems.length} matching listing${filteredItems.length === 1 ? "" : "s"}`}
+                            sx={{ fontWeight: 800, bgcolor: "rgba(16,61,43,0.08)", color: "#103d2b" }}
+                        />
+                        <Chip
+                            label={selectedCategoryLabel}
+                            variant="outlined"
+                            sx={{ fontWeight: 700 }}
+                        />
+                        {normalizedSearch ? (
+                            <Chip
+                                label={`Search: "${searchText.trim()}"`}
+                                variant="outlined"
+                                sx={{ fontWeight: 700 }}
+                            />
+                        ) : null}
+                    </Stack>
+                </Box>
+
                 {loading ? (
                     <Grid container spacing={2.5} sx={{ mt: 3 }}>
                         {Array.from({ length: 8 }).map((_, i) => (
@@ -403,6 +516,38 @@ export default function Work() {
                         <Typography sx={{ mt: 1.5, color: "text.secondary", maxWidth: 620, mx: "auto" }}>Once users add more services and admins approve them, this page will feel like a full freelance marketplace.</Typography>
                         <Button variant="contained" onClick={() => navigate("/my-listings/new")} sx={{ mt: 3, borderRadius: 0, px: 3, py: 1.35, bgcolor: "#103d2b", fontWeight: 800, "&:hover": { bgcolor: "#14532d" } }}>Create the first listing</Button>
                     </Box>
+                ) : hasActiveFilters ? (
+                    filteredItems.length === 0 ? (
+                        <Box sx={{ mt: 6, textAlign: "center", p: { xs: 4, md: 6 }, borderRadius: 0, background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid rgba(15,23,42,0.08)" }}>
+                            <Avatar sx={{ width: 64, height: 64, mx: "auto", mb: 2, bgcolor: "rgba(15,23,42,0.06)", color: "#0f172a" }}>
+                                <SearchRoundedIcon />
+                            </Avatar>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: "#0f172a" }}>
+                                No listings matched your filters
+                            </Typography>
+                            <Typography sx={{ mt: 1.5, color: "text.secondary", maxWidth: 620, mx: "auto" }}>
+                                Try a different search phrase or switch the category dropdown back to all categories.
+                            </Typography>
+                            <Button
+                                variant="contained"
+                                onClick={() => {
+                                    setSearchText("");
+                                    setSelectedCategory("all");
+                                }}
+                                sx={{ mt: 3, borderRadius: 0, px: 3, py: 1.35, bgcolor: "#103d2b", fontWeight: 800, "&:hover": { bgcolor: "#14532d" } }}
+                            >
+                                Clear filters
+                            </Button>
+                        </Box>
+                    ) : (
+                        <Section
+                            title="Filtered marketplace results"
+                            subtitle="Listings matching your current search and category filter."
+                            items={filteredItems}
+                            navigate={navigate}
+                            categoryLabel={categoryLabel}
+                        />
+                    )
                 ) : (
                     <>
                         <Section title="Featured offers" subtitle="The strongest offers are highlighted first to create a more marketplace-like first impression." items={featuredListings} navigate={navigate} categoryLabel={categoryLabel} featured />

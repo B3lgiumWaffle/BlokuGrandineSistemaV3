@@ -271,10 +271,10 @@ namespace BlokuGrandiniuSistema.Services
                 .ToListAsync(ct);
 
             var fragmentSpeedScore = CalculateFragmentSpeedScore(contract, milestones, requirements, fragments);
-            var revisionScore = CalculateRevisionScore(milestones, fragmentHistory);
+            var revisionScore = CalculateRevisionScore(milestones, fragments);
             var contractSpeedScore = CalculateContractSpeedScore(contract, requirements, milestones);
             var messageResponseScore = CalculateMessageResponseScore(contract, messages);
-            var rejectedFragmentsScore = CalculateRejectedFragmentsScore(fragmentHistory);
+            var rejectedFragmentsScore = CalculateRejectedFragmentsScore(fragments);
 
             return new ContractMetricsDto
             {
@@ -284,7 +284,7 @@ namespace BlokuGrandiniuSistema.Services
                 ContractSpeedScore = contractSpeedScore.Score,
                 MessageResponseScore = messageResponseScore.Score,
                 RejectedFragmentsScore = rejectedFragmentsScore.Score,
-                RejectedFragmentsCount = CountRejectedFragments(fragmentHistory),
+                RejectedFragmentsCount = CountRejectedFragments(fragments),
                 FragmentSpeedReason = fragmentSpeedScore.Reason,
                 RevisionCountReason = revisionScore.Reason,
                 ContractSpeedReason = contractSpeedScore.Reason,
@@ -349,16 +349,16 @@ namespace BlokuGrandiniuSistema.Services
 
         private ScorePart CalculateRevisionScore(
             List<b_contract_milestone> milestones,
-            List<b_completed_list_fragment_history> fragmentHistory)
+            List<b_completed_listing_fragment> fragments)
         {
             var milestoneScores = new List<decimal>();
             var rejectCounts = new List<int>();
 
             foreach (var milestone in milestones)
             {
-                var rejectCount = fragmentHistory.Count(h =>
-                    h.milestoneIndex == milestone.milestoneNo &&
-                    string.Equals(h.newStatus, "Rejected", StringComparison.OrdinalIgnoreCase));
+                var rejectCount = fragments.Count(f =>
+                    f.fkMilestoneId == milestone.milestoneId &&
+                    string.Equals(f.status, "Rejected", StringComparison.OrdinalIgnoreCase));
                 rejectCounts.Add(rejectCount);
 
                 decimal score;
@@ -468,9 +468,9 @@ namespace BlokuGrandiniuSistema.Services
         }
 
         private ScorePart CalculateRejectedFragmentsScore(
-            List<b_completed_list_fragment_history> fragmentHistory)
+            List<b_completed_listing_fragment> fragments)
         {
-            var rejectedCount = CountRejectedFragments(fragmentHistory);
+            var rejectedCount = CountRejectedFragments(fragments);
 
             decimal score;
             if (rejectedCount <= 1) score = 2m;
@@ -484,10 +484,10 @@ namespace BlokuGrandiniuSistema.Services
             };
         }
 
-        private static int CountRejectedFragments(List<b_completed_list_fragment_history> fragmentHistory)
+        private static int CountRejectedFragments(List<b_completed_listing_fragment> fragments)
         {
-            return fragmentHistory.Count(h =>
-                string.Equals(h.newStatus, "Rejected", StringComparison.OrdinalIgnoreCase));
+            return fragments.Count(f =>
+                string.Equals(f.status, "Rejected", StringComparison.OrdinalIgnoreCase));
         }
 
         private static ScorePart EvaluateThreshold(decimal actualValue, decimal threshold, bool isAtLeast, string label)

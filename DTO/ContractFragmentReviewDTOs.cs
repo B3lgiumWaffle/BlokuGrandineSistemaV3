@@ -12,4 +12,9 @@
         public decimal ProviderAmountEth { get; set; }
         public decimal ClientRefundAmountEth { get; set; }
     }
+
+    public class AdminResolveDisputeDTO
+    {
+        public string? ReviewComment { get; set; }
+    }
 }

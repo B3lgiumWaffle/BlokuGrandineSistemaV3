@@ -453,6 +453,14 @@ namespace BlokuGrandiniuSistema.Controllers;
         if (!string.Equals(fragment.status, "Submitted", StringComparison.OrdinalIgnoreCase))
             return BadRequest("Only submitted fragments can be rejected.");
 
+        var isReturnedAfterAdminApproval =
+            fragment.approvedByUserId.HasValue &&
+            fragment.approvedByUserId.Value != contract.fkClientUserId &&
+            fragment.approvedAt.HasValue;
+
+        if (isReturnedAfterAdminApproval)
+            return BadRequest("This fragment was already approved by administrator and can only be approved by client.");
+
         var milestone = await _db.b_contract_milestones
             .FirstOrDefaultAsync(m => m.milestoneId == fragment.fkMilestoneId && m.fkContractId == contractId, ct);
 
@@ -519,6 +527,102 @@ namespace BlokuGrandiniuSistema.Controllers;
             contractStatus = contract.status,
             fragmentStatus = fragment.status,
             milestoneStatus = milestone.status
+        });
+    }
+
+    [Authorize]
+    [HttpPost("contracts/{contractId:int}/fragments/{fragmentId:int}/ask-admin")]
+    public async Task<IActionResult> AskForAdministrator(
+        int contractId,
+        int fragmentId,
+        CancellationToken ct)
+    {
+        var userId = GetUserIdFromJwt();
+        if (userId == null) return Unauthorized();
+
+        var contract = await _db.b_contracts
+            .FirstOrDefaultAsync(c => c.contractId == contractId, ct);
+
+        if (contract == null) return NotFound("Contract not found.");
+        if (contract.fkProviderUserId != userId.Value) return Forbid();
+
+        var fragment = await _db.b_completed_listing_fragments
+            .FirstOrDefaultAsync(f => f.fragmentId == fragmentId && f.fkContractId == contractId, ct);
+
+        if (fragment == null) return NotFound("Fragment not found.");
+
+        if (!string.Equals(fragment.status, "Rejected", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Only rejected fragments can be escalated to administrator.");
+
+        var milestone = await _db.b_contract_milestones
+            .FirstOrDefaultAsync(m => m.milestoneId == fragment.fkMilestoneId && m.fkContractId == contractId, ct);
+
+        if (milestone == null) return NotFound("Milestone not found.");
+
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        var oldStatus = fragment.status;
+        fragment.status = "Disputed";
+        fragment.updatedAt = DateTime.UtcNow;
+        fragment.reviewComment = AppendAuditNote(
+            fragment.reviewComment,
+            $"Provider requested administrator review at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC.");
+
+        _db.b_completed_list_fragment_histories.Add(new b_completed_list_fragment_history
+        {
+            fkContractId = contract.contractId,
+            milestoneIndex = milestone.milestoneNo,
+            oldStatus = oldStatus,
+            newStatus = "Disputed",
+            changedByUserId = userId.Value,
+            changedAt = DateTime.UtcNow,
+            note = "Provider requested administrator review.",
+            delayInDays = CalculateDelayInDays(fragment.submittedAt, await GetMilestoneDeadline(milestone.fkRequirementId, ct)),
+            isFinalState = false
+        });
+
+        var adminRoleIds = await _db.b_roles
+            .Where(r => r.RoleName == "Admin")
+            .Select(r => r.RoleId)
+            .ToListAsync(ct);
+
+        var adminUserIds = await _db.b_users
+            .Where(u => adminRoleIds.Contains(u.RoleId))
+            .Select(u => u.UserId)
+            .ToListAsync(ct);
+
+        foreach (var adminUserId in adminUserIds.Distinct())
+        {
+            _db.b_notifications.Add(new b_notification
+            {
+                fkUserId = adminUserId,
+                title = "Fragment dispute requires review",
+                message = $"Contract #{contract.contractId}, milestone #{milestone.milestoneNo} was escalated by provider.",
+                type = "contract_fragment_disputed",
+                referenceId = fragment.fragmentId,
+                isRead = false,
+                createdAt = DateTime.UtcNow
+            });
+        }
+
+        _db.b_notifications.Add(new b_notification
+        {
+            fkUserId = contract.fkClientUserId,
+            title = "Fragment dispute opened",
+            message = $"Provider asked administrator to review contract #{contract.contractId}, milestone #{milestone.milestoneNo}.",
+            type = "contract_fragment_dispute_opened",
+            referenceId = contract.contractId,
+            isRead = false,
+            createdAt = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+
+        return Ok(new
+        {
+            message = "Administrator review requested successfully.",
+            fragmentStatus = fragment.status
         });
     }
 
@@ -775,6 +879,10 @@ namespace BlokuGrandiniuSistema.Controllers;
                 submittedByUserId = f.submittedByUserId,
                 submittedAt = f.submittedAt,
                 status = f.status,
+                isDisputed = f.status == "Disputed",
+                rejectLocked = f.status == "Submitted" &&
+                               f.approvedByUserId.HasValue &&
+                               f.approvedByUserId != contract.fkClientUserId,
                 reviewComment = f.reviewComment,
                 approvedByUserId = f.approvedByUserId,
                 approvedAt = f.approvedAt,
@@ -992,11 +1100,11 @@ namespace BlokuGrandiniuSistema.Controllers;
         var isLateForContractEnd = isLastMilestone && contractDeadline.HasValue && fragment.submittedAt.Date > contractDeadline.Value.Date;
         var submissionCount = await _db.b_completed_listing_fragments
             .CountAsync(f => f.fkContractId == contract.contractId && f.fkMilestoneId == milestone.milestoneId, ct);
-        var rejectedCountForMilestone = await _db.b_completed_list_fragment_histories
+        var rejectedCountForMilestone = await _db.b_completed_listing_fragments
             .CountAsync(h =>
                 h.fkContractId == contract.contractId &&
-                h.milestoneIndex == milestone.milestoneNo &&
-                h.newStatus == "Rejected", ct);
+                h.fkMilestoneId == milestone.milestoneId &&
+                h.status == "Rejected", ct);
 
         var isHighRevisionCount = rejectedCountForMilestone > terms.revisionCountMaxAverage;
         var isLowFragmentSpeed = isLateForRequirement;
@@ -1153,6 +1261,14 @@ namespace BlokuGrandiniuSistema.Controllers;
         if (!deadline.HasValue) return 0;
         if (submittedAt.Date <= deadline.Value.Date) return 0;
         return (submittedAt.Date - deadline.Value.Date).Days;
+    }
+
+    private static string AppendAuditNote(string? currentText, string addition)
+    {
+        if (string.IsNullOrWhiteSpace(currentText))
+            return addition;
+
+        return $"{currentText.Trim()}{Environment.NewLine}{Environment.NewLine}{addition}";
     }
 
     private static string BuildApprovalReason(

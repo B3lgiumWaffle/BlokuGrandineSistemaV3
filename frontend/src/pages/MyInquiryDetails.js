@@ -18,6 +18,7 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiDelete, apiPutFormData, apiPostNoBody, apiPost } from "../api/api";
+import { useAppDialog } from "../components/AppDialogProvider";
 import { createDisplayNumberMap, getDisplayNumber, getInquiryStatusMeta } from "../utils/displayNames";
 
 const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";
@@ -101,6 +102,7 @@ function defaultDraftTerms() {
 export default function MyInquiryDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const dialog = useAppDialog();
     const token = useMemo(() => localStorage.getItem("token"), []);
 
     const [loading, setLoading] = useState(true);
@@ -200,24 +202,28 @@ export default function MyInquiryDetails() {
                 contract = await apiPost(`/api/contracts/from-inquiry/${id}`);
             }
 
-            alert("Accepted.");
+            await dialog.alert({ variant: "success", title: "Inquiry accepted", message: "The inquiry was accepted successfully." });
             navigate(`/contracts/${contract.contractId}`);
         } catch (e) {
-            alert(e?.message ?? "Accept failed");
+            await dialog.alert({ variant: "error", title: "Accept failed", message: e?.message ?? "Accept failed" });
         }
     };
 
     const onDecline = async () => {
-        const ok = window.confirm(`Decline inquiry${displayNumber ? ` #${displayNumber}` : ""}? This will delete it.`);
+        const ok = await dialog.confirm({
+            title: `Decline inquiry${displayNumber ? ` #${displayNumber}` : ""}?`,
+            message: "This will delete it.",
+            confirmText: "Decline"
+        });
         if (!ok) return;
 
         try {
             await apiDelete(`/api/inquiries/${id}`);
-            alert("Inquiry declined (deleted).");
+            await dialog.alert({ variant: "success", title: "Inquiry declined", message: "The inquiry was declined and deleted." });
             navigate("/my-inquiries");
         } catch (e) {
             console.error(e);
-            alert(e?.message ?? "Failed to decline (delete) inquiry");
+            await dialog.alert({ variant: "error", title: "Decline failed", message: e?.message ?? "Failed to decline (delete) inquiry" });
         }
     };
 
@@ -333,10 +339,10 @@ export default function MyInquiryDetails() {
             });
 
             setIsEditing(false);
-            alert("Inquiry updated.");
+            await dialog.alert({ variant: "success", title: "Inquiry updated", message: "The inquiry was updated successfully." });
         } catch (e) {
             console.error(e);
-            alert(e?.message ?? "Failed to update inquiry");
+            await dialog.alert({ variant: "error", title: "Update failed", message: e?.message ?? "Failed to update inquiry" });
         } finally {
             setSaving(false);
         }

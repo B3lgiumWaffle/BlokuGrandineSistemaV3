@@ -2,7 +2,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using BlokuGrandiniuSistema.DTOs;
 using BlokuGrandiniuSistema.Models;
+using BlokuGrandiniuSistema.Services;
 
 namespace BlokuGrandiniuSistema.Controllers;
 
@@ -12,10 +14,12 @@ namespace BlokuGrandiniuSistema.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly IValuationService _valuationService;
 
-    public AdminController(AppDbContext db)
+    public AdminController(AppDbContext db, IValuationService valuationService)
     {
         _db = db;
+        _valuationService = valuationService;
     }
 
     [HttpGet("listings")]
@@ -413,6 +417,393 @@ public class AdminController : ControllerBase
         }
     }
 
+    [HttpGet("disputes")]
+    public async Task<IActionResult> GetDisputes(CancellationToken ct)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var disputes = await (
+            from f in _db.b_completed_listing_fragments.AsNoTracking()
+            join c in _db.b_contracts.AsNoTracking() on f.fkContractId equals c.contractId
+            join milestone in _db.b_contract_milestones.AsNoTracking() on f.fkMilestoneId equals milestone.milestoneId
+            join inquiry in _db.b_inquiries.AsNoTracking() on c.fkInquiryId equals inquiry.inquiryId
+            join listing in _db.b_listings.AsNoTracking() on inquiry.fk_listingId equals listing.listingId
+            join provider in _db.b_users.AsNoTracking() on c.fkProviderUserId equals provider.UserId
+            join client in _db.b_users.AsNoTracking() on c.fkClientUserId equals client.UserId
+            where f.status == "Disputed"
+            orderby f.updatedAt descending, f.submittedAt descending
+            select new
+            {
+                fragmentId = f.fragmentId,
+                contractId = c.contractId,
+                contractStatus = c.status,
+                milestoneId = milestone.milestoneId,
+                milestoneNo = milestone.milestoneNo,
+                title = f.title,
+                status = f.status,
+                submittedAt = f.submittedAt,
+                disputedAt = f.updatedAt,
+                providerUserId = provider.UserId,
+                providerName = !string.IsNullOrWhiteSpace(provider.Username)
+                    ? provider.Username
+                    : ((provider.firstname ?? "") + " " + (provider.lastname ?? "")).Trim(),
+                clientUserId = client.UserId,
+                clientName = !string.IsNullOrWhiteSpace(client.Username)
+                    ? client.Username
+                    : ((client.firstname ?? "") + " " + (client.lastname ?? "")).Trim(),
+                listingTitle = listing.Title
+            })
+            .ToListAsync(ct);
+
+        return Ok(disputes);
+    }
+
+    [HttpGet("disputes/{fragmentId:int}")]
+    public async Task<IActionResult> GetDisputeById(int fragmentId, CancellationToken ct)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var dispute = await (
+            from f in _db.b_completed_listing_fragments.AsNoTracking()
+            join c in _db.b_contracts.AsNoTracking() on f.fkContractId equals c.contractId
+            join milestone in _db.b_contract_milestones.AsNoTracking() on f.fkMilestoneId equals milestone.milestoneId
+            join inquiry in _db.b_inquiries.AsNoTracking() on c.fkInquiryId equals inquiry.inquiryId
+            join listing in _db.b_listings.AsNoTracking() on inquiry.fk_listingId equals listing.listingId
+            join provider in _db.b_users.AsNoTracking() on c.fkProviderUserId equals provider.UserId
+            join client in _db.b_users.AsNoTracking() on c.fkClientUserId equals client.UserId
+            where f.fragmentId == fragmentId && f.status == "Disputed"
+            select new
+            {
+                fragment = new
+                {
+                    fragmentId = f.fragmentId,
+                    contractId = f.fkContractId,
+                    milestoneId = f.fkMilestoneId,
+                    requirementId = f.fkRequirementId,
+                    title = f.title,
+                    description = f.description,
+                    filePath = f.filePath,
+                    submittedByUserId = f.submittedByUserId,
+                    submittedAt = f.submittedAt,
+                    status = f.status,
+                    reviewComment = f.reviewComment,
+                    approvedByUserId = f.approvedByUserId,
+                    approvedAt = f.approvedAt,
+                    releaseTxHash = f.releaseTxHash,
+                    createdAt = f.createdAt,
+                    updatedAt = f.updatedAt
+                },
+                contract = new
+                {
+                    contractId = c.contractId,
+                    inquiryId = c.fkInquiryId,
+                    status = c.status,
+                    agreedAmountEur = c.agreedAmountEur,
+                    fundedAmountEth = c.fundedAmountEth,
+                    milestoneCount = c.milestoneCount,
+                    smartContractAddress = c.smartContractAddress,
+                    chainProjectId = c.chainProjectId,
+                    listingTitle = listing.Title
+                },
+                milestone = new
+                {
+                    milestoneId = milestone.milestoneId,
+                    milestoneNo = milestone.milestoneNo,
+                    status = milestone.status,
+                    amountEurSnapshot = milestone.amountEurSnapshot,
+                    amountEth = milestone.amountEth,
+                    releaseTxHash = milestone.releaseTxHash,
+                    releasedAt = milestone.releasedAt
+                },
+                provider = new
+                {
+                    userId = provider.UserId,
+                    username = provider.Username,
+                    email = provider.Email,
+                    displayName = !string.IsNullOrWhiteSpace(provider.Username)
+                        ? provider.Username
+                        : ((provider.firstname ?? "") + " " + (provider.lastname ?? "")).Trim()
+                },
+                client = new
+                {
+                    userId = client.UserId,
+                    username = client.Username,
+                    email = client.Email,
+                    displayName = !string.IsNullOrWhiteSpace(client.Username)
+                        ? client.Username
+                        : ((client.firstname ?? "") + " " + (client.lastname ?? "")).Trim()
+                }
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (dispute == null)
+            return NotFound("Dispute not found.");
+
+        var requirementId = dispute.fragment.requirementId as int?;
+        var requirement = requirementId.HasValue
+            ? await _db.b_requirements
+                .AsNoTracking()
+                .Where(r => r.requirementId == requirementId.Value)
+                .Select(r => new
+                {
+                    requirementId = r.requirementId,
+                    description = r.description,
+                    fileUrl = r.fileUrl,
+                    forseenCompletionDate = r.forseenCompletionDate
+                })
+                .FirstOrDefaultAsync(ct)
+            : null;
+
+        var relatedFragments = await _db.b_completed_listing_fragments
+            .AsNoTracking()
+            .Where(f => f.fkContractId == dispute.contract.contractId && f.fkMilestoneId == dispute.fragment.milestoneId)
+            .OrderByDescending(f => f.submittedAt)
+            .Select(f => new
+            {
+                fragmentId = f.fragmentId,
+                title = f.title,
+                status = f.status,
+                submittedAt = f.submittedAt,
+                approvedAt = f.approvedAt,
+                reviewComment = f.reviewComment,
+                filePath = f.filePath
+            })
+            .ToListAsync(ct);
+
+        return Ok(new
+        {
+            dispute = new
+            {
+                dispute.fragment,
+                dispute.contract,
+                dispute.milestone,
+                requirement,
+                dispute.provider,
+                dispute.client
+            },
+            relatedFragments
+        });
+    }
+
+    [HttpPost("disputes/{fragmentId:int}/approve")]
+    public async Task<IActionResult> ApproveDispute(int fragmentId, [FromBody] AdminResolveDisputeDTO? dto, CancellationToken ct)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var adminUserId = GetUserIdFromJwt();
+        if (adminUserId == null) return Unauthorized();
+
+        var fragment = await _db.b_completed_listing_fragments
+            .FirstOrDefaultAsync(f => f.fragmentId == fragmentId, ct);
+
+        if (fragment == null) return NotFound("Fragment not found.");
+        if (!string.Equals(fragment.status, "Disputed", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Only disputed fragments can be approved by administrator.");
+
+        var contract = await _db.b_contracts
+            .FirstOrDefaultAsync(c => c.contractId == fragment.fkContractId, ct);
+
+        if (contract == null) return NotFound("Contract not found.");
+
+        var milestone = await _db.b_contract_milestones
+            .FirstOrDefaultAsync(m => m.milestoneId == fragment.fkMilestoneId && m.fkContractId == contract.contractId, ct);
+
+        if (milestone == null) return NotFound("Milestone not found.");
+
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        var oldFragmentStatus = fragment.status;
+        var oldContractStatus = contract.status;
+        var competingFragments = await _db.b_completed_listing_fragments
+            .Where(f =>
+                f.fkContractId == contract.contractId &&
+                f.fkMilestoneId == milestone.milestoneId &&
+                f.fragmentId != fragment.fragmentId &&
+                (f.status == "Submitted" || f.status == "Disputed"))
+            .ToListAsync(ct);
+
+        fragment.status = "Submitted";
+        fragment.approvedByUserId = adminUserId.Value;
+        fragment.approvedAt = DateTime.UtcNow;
+        fragment.releaseTxHash = null;
+        fragment.updatedAt = DateTime.UtcNow;
+        fragment.reviewComment = AppendAuditNote(
+            fragment.reviewComment,
+            string.IsNullOrWhiteSpace(dto?.ReviewComment)
+                ? "Administrator approved the disputed fragment and returned it to the client for final approval."
+                : $"Administrator approved the disputed fragment and returned it to the client for final approval. {dto!.ReviewComment!.Trim()}");
+
+        milestone.status = "WaitingForApproval";
+        milestone.updatedAt = DateTime.UtcNow;
+        contract.status = "WaitingForApproval";
+        contract.updatedAt = DateTime.UtcNow;
+
+        _db.b_contract_histories.Add(new b_contract_history
+        {
+            fkContractId = contract.contractId,
+            oldStatus = oldContractStatus,
+            newStatus = contract.status,
+            changedByUserId = adminUserId.Value,
+            changedAt = DateTime.UtcNow,
+            note = $"Administrator approved disputed fragment #{fragment.fragmentId} and returned it to the client for final approval."
+        });
+
+        _db.b_completed_list_fragment_histories.Add(new b_completed_list_fragment_history
+        {
+            fkContractId = contract.contractId,
+            milestoneIndex = milestone.milestoneNo,
+            oldStatus = oldFragmentStatus,
+            newStatus = "Submitted",
+            changedByUserId = adminUserId.Value,
+            changedAt = DateTime.UtcNow,
+            note = string.IsNullOrWhiteSpace(dto?.ReviewComment)
+                ? "Administrator approved disputed fragment and returned it to the client for final approval."
+                : $"Administrator approved disputed fragment and returned it to the client for final approval. {dto!.ReviewComment!.Trim()}",
+            delayInDays = 0,
+            isFinalState = false
+        });
+
+        foreach (var competingFragment in competingFragments)
+        {
+            var oldCompetingStatus = competingFragment.status;
+
+            competingFragment.status = "Rejected";
+            competingFragment.approvedByUserId = adminUserId.Value;
+            competingFragment.approvedAt = DateTime.UtcNow;
+            competingFragment.updatedAt = DateTime.UtcNow;
+            competingFragment.reviewComment = AppendAuditNote(
+                competingFragment.reviewComment,
+                $"Administrator approved fragment #{fragment.fragmentId} for this milestone, so this competing fragment was closed as rejected.");
+
+            _db.b_completed_list_fragment_histories.Add(new b_completed_list_fragment_history
+            {
+                fkContractId = contract.contractId,
+                milestoneIndex = milestone.milestoneNo,
+                oldStatus = oldCompetingStatus,
+                newStatus = "Rejected",
+                changedByUserId = adminUserId.Value,
+                changedAt = DateTime.UtcNow,
+                note = $"Closed because administrator approved fragment #{fragment.fragmentId} for the same milestone.",
+                delayInDays = 0,
+                isFinalState = true
+            });
+        }
+
+        _db.b_notifications.Add(new b_notification
+        {
+            fkUserId = contract.fkProviderUserId,
+            title = "Dispute approved",
+            message = $"Administrator approved your disputed fragment for contract #{contract.contractId}. The client can now only approve it.",
+            type = "contract_fragment_dispute_approved",
+            referenceId = contract.contractId,
+            isRead = false,
+            createdAt = DateTime.UtcNow
+        });
+
+        _db.b_notifications.Add(new b_notification
+        {
+            fkUserId = contract.fkClientUserId,
+            title = "Fragment returned for approval",
+            message = $"Administrator approved the disputed fragment for contract #{contract.contractId}. You can approve it, but you can no longer reject it.",
+            type = "contract_fragment_dispute_approved",
+            referenceId = contract.contractId,
+            isRead = false,
+            createdAt = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+
+        return Ok(new { message = "Dispute approved successfully and returned to client." });
+    }
+
+    [HttpPost("disputes/{fragmentId:int}/reject")]
+    public async Task<IActionResult> RejectDispute(int fragmentId, [FromBody] AdminResolveDisputeDTO? dto, CancellationToken ct)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var adminUserId = GetUserIdFromJwt();
+        if (adminUserId == null) return Unauthorized();
+
+        var fragment = await _db.b_completed_listing_fragments
+            .FirstOrDefaultAsync(f => f.fragmentId == fragmentId, ct);
+
+        if (fragment == null) return NotFound("Fragment not found.");
+        if (!string.Equals(fragment.status, "Disputed", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Only disputed fragments can be rejected by administrator.");
+
+        var contract = await _db.b_contracts
+            .FirstOrDefaultAsync(c => c.contractId == fragment.fkContractId, ct);
+
+        if (contract == null) return NotFound("Contract not found.");
+
+        var milestone = await _db.b_contract_milestones
+            .FirstOrDefaultAsync(m => m.milestoneId == fragment.fkMilestoneId && m.fkContractId == contract.contractId, ct);
+
+        if (milestone == null) return NotFound("Milestone not found.");
+
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        var oldStatus = fragment.status;
+        fragment.status = "Rejected";
+        fragment.approvedByUserId = adminUserId.Value;
+        fragment.approvedAt = DateTime.UtcNow;
+        fragment.updatedAt = DateTime.UtcNow;
+        fragment.reviewComment = AppendAuditNote(
+            fragment.reviewComment,
+            string.IsNullOrWhiteSpace(dto?.ReviewComment)
+                ? "Administrator kept the fragment rejected."
+                : $"Administrator kept the fragment rejected. {dto!.ReviewComment!.Trim()}");
+
+        milestone.status = "UnderRevision";
+        milestone.updatedAt = DateTime.UtcNow;
+
+        contract.status = "UnderRevision";
+        contract.updatedAt = DateTime.UtcNow;
+
+        _db.b_completed_list_fragment_histories.Add(new b_completed_list_fragment_history
+        {
+            fkContractId = contract.contractId,
+            milestoneIndex = milestone.milestoneNo,
+            oldStatus = oldStatus,
+            newStatus = "Rejected",
+            changedByUserId = adminUserId.Value,
+            changedAt = DateTime.UtcNow,
+            note = string.IsNullOrWhiteSpace(dto?.ReviewComment)
+                ? "Administrator kept the disputed fragment rejected."
+                : dto!.ReviewComment!.Trim(),
+            delayInDays = 0,
+            isFinalState = true
+        });
+
+        _db.b_notifications.Add(new b_notification
+        {
+            fkUserId = contract.fkProviderUserId,
+            title = "Dispute rejected",
+            message = $"Administrator kept your fragment rejected for contract #{contract.contractId}.",
+            type = "contract_fragment_dispute_rejected",
+            referenceId = contract.contractId,
+            isRead = false,
+            createdAt = DateTime.UtcNow
+        });
+
+        _db.b_notifications.Add(new b_notification
+        {
+            fkUserId = contract.fkClientUserId,
+            title = "Dispute resolved",
+            message = $"Administrator kept fragment rejected for contract #{contract.contractId}.",
+            type = "contract_fragment_dispute_rejected",
+            referenceId = contract.contractId,
+            isRead = false,
+            createdAt = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+
+        return Ok(new { message = "Dispute rejected successfully." });
+    }
+
     private async Task<object> BuildUserRatingsSummary(int userId, CancellationToken ct)
     {
         var userRatings = await _db.b_ratings
@@ -481,5 +872,13 @@ public class AdminController : ControllerBase
             User.FindFirstValue("sub");
 
         return int.TryParse(s, out var id) ? id : null;
+    }
+
+    private static string AppendAuditNote(string? currentText, string addition)
+    {
+        if (string.IsNullOrWhiteSpace(currentText))
+            return addition;
+
+        return $"{currentText.Trim()}{Environment.NewLine}{Environment.NewLine}{addition}";
     }
 }

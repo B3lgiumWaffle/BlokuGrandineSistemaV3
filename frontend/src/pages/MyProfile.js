@@ -18,10 +18,12 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import PersonIcon from "@mui/icons-material/Person";
 import LockIcon from "@mui/icons-material/Lock";
 import { useNavigate } from "react-router-dom";
+import { useAppDialog } from "../components/AppDialogProvider";
 import { PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
 export default function EditProfile() {
     const navigate = useNavigate();
+    const dialog = useAppDialog();
     const token = useMemo(() => localStorage.getItem("token"), []);
 
     const [active, setActive] = useState("details");
@@ -128,12 +130,12 @@ export default function EditProfile() {
         }
 
         if (!email.trim()) {
-            alert("Must provide email");
+            await dialog.alert({ variant: "warning", title: "Email required", message: "Must provide email" });
             return;
         }
 
         if (!isValidWalletAddress(walletAddress)) {
-            alert("Wallet address format is invalid");
+            await dialog.alert({ variant: "warning", title: "Invalid wallet address", message: "Wallet address format is invalid" });
             return;
         }
 
@@ -160,12 +162,12 @@ export default function EditProfile() {
 
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Error: ${res.status} ${txt}`);
+                await dialog.alert({ variant: "error", title: "Profile update failed", message: `Error: ${res.status} ${txt}` });
                 return;
             }
 
             await uploadAvatarIfNeeded();
-            alert("Profile updated");
+            await dialog.alert({ variant: "success", title: "Profile updated", message: "Your profile was updated successfully." });
         } catch (e) {
             console.error(e);
             setErr("Couldn't save profile");
@@ -181,17 +183,17 @@ export default function EditProfile() {
         }
 
         if (!currentPassword || !newPassword || !repeatNewPassword) {
-            alert("Please fill all password fields");
+            await dialog.alert({ variant: "warning", title: "Missing password fields", message: "Please fill all password fields" });
             return;
         }
 
         if (newPassword !== repeatNewPassword) {
-            alert("New password doesnt match");
+            await dialog.alert({ variant: "warning", title: "Passwords do not match", message: "New password doesnt match" });
             return;
         }
 
         if (newPassword.length < 6) {
-            alert("Password is too short (must be atleast 6 symbols)");
+            await dialog.alert({ variant: "warning", title: "Password too short", message: "Password is too short (must be atleast 6 symbols)" });
             return;
         }
 
@@ -212,14 +214,14 @@ export default function EditProfile() {
 
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Error: ${res.status} ${txt}`);
+                await dialog.alert({ variant: "error", title: "Password change failed", message: `Error: ${res.status} ${txt}` });
                 return;
             }
 
             setCurrentPassword("");
             setNewPassword("");
             setRepeatNewPassword("");
-            alert("Password changed");
+            await dialog.alert({ variant: "success", title: "Password changed", message: "Your password was changed successfully." });
         } catch (e) {
             console.error(e);
             setErr("Password couldn't be changed");

@@ -17,10 +17,12 @@ import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import { useNavigate } from "react-router-dom";
+import { useAppDialog } from "../components/AppDialogProvider";
 import { PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
 export default function AddListing() {
     const navigate = useNavigate();
+    const dialog = useAppDialog();
     const token = useMemo(() => localStorage.getItem("token"), []);
 
     const API_BASE = "https://localhost:7278";
@@ -132,12 +134,12 @@ export default function AddListing() {
         if (!token) return navigate("/login");
 
         if (!selectedCategory) {
-            alert("Please choose a category.");
+            await dialog.alert({ variant: "warning", title: "Category required", message: "Please choose a category." });
             return;
         }
 
         if (!title.trim()) {
-            alert("Please enter a title.");
+            await dialog.alert({ variant: "warning", title: "Title required", message: "Please enter a title." });
             return;
         }
 
@@ -164,7 +166,7 @@ export default function AddListing() {
 
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                alert(`Error: ${res.status} ${txt}`);
+                await dialog.alert({ variant: "error", message: `Error: ${res.status} ${txt}` });
                 return;
             }
 
@@ -180,7 +182,7 @@ export default function AddListing() {
             navigate("/my-listings");
         } catch (e) {
             console.error(e);
-            alert(`Couldn't save': ${e.message || e}`);
+            await dialog.alert({ variant: "error", title: "Listing was not saved", message: `Couldn't save: ${e.message || e}` });
         } finally {
             setSaving(false);
         }

@@ -23,9 +23,12 @@ import {
     MenuItem,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import CurrencyExchangeRoundedIcon from "@mui/icons-material/CurrencyExchangeRounded";
 import DeleteIcon from "@mui/icons-material/Delete";
+import NotesRoundedIcon from "@mui/icons-material/NotesRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAppDialog } from "../components/AppDialogProvider";
 import { apiGet, apiPostFormData } from "../api/api";
 
 function normalizeListing(raw) {
@@ -244,69 +247,189 @@ function InquiryModal({
     ];
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-            <DialogTitle>Send inquiry</DialogTitle>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            maxWidth="md"
+            fullWidth
+            PaperProps={{
+                sx: {
+                    borderRadius: 0,
+                    overflow: "hidden",
+                    boxShadow: "0 28px 90px rgba(15,23,42,0.22)"
+                }
+            }}
+        >
+            <DialogTitle
+                sx={{
+                    px: 3,
+                    py: 2.5,
+                    borderBottom: "1px solid rgba(15,23,42,0.08)",
+                    background: "linear-gradient(135deg, #f7fdf9 0%, #eefbf4 48%, #f8fafc 100%)"
+                }}
+            >
+                <Typography variant="overline" sx={{ display: "block", color: "#0f766e", fontWeight: 800, letterSpacing: 1.2 }}>
+                    Marketplace inquiry
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a", lineHeight: 1.1 }}>
+                    Send inquiry
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 0.75, color: "text.secondary", maxWidth: 720 }}>
+                    Introduce your project clearly, share the budget you have in mind, and make the first message feel more professional.
+                </Typography>
+            </DialogTitle>
 
-            <DialogContent>
-                <Stack spacing={2} sx={{ pt: 1 }}>
-                    <Box>
-                        <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                            Suggested price per listing creator
-                        </Typography>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            {suggestedText}
-                        </Typography>
+            <DialogContent sx={{ px: 3, py: 3 }}>
+                <Stack spacing={2.5}>
+                    <Box
+                        sx={{
+                            p: 2.25,
+                            border: "1px solid rgba(15,23,42,0.08)",
+                            background: "linear-gradient(135deg, rgba(16,61,43,0.05) 0%, rgba(27,186,120,0.10) 100%)"
+                        }}
+                    >
+                        <Stack
+                            direction={{ xs: "column", md: "row" }}
+                            spacing={2}
+                            alignItems={{ xs: "flex-start", md: "center" }}
+                            justifyContent="space-between"
+                        >
+                            <Stack direction="row" spacing={1.5} alignItems="center">
+                                <Box
+                                    sx={{
+                                        width: 50,
+                                        height: 50,
+                                        display: "grid",
+                                        placeItems: "center",
+                                        bgcolor: "rgba(16,61,43,0.10)",
+                                        color: "#14532d"
+                                    }}
+                                >
+                                    <CurrencyExchangeRoundedIcon />
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                                        Suggested price from listing creator
+                                    </Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a" }}>
+                                        {suggestedText}
+                                    </Typography>
+                                </Box>
+                            </Stack>
+
+                            <Chip
+                                label="First impression matters"
+                                sx={{
+                                    fontWeight: 800,
+                                    bgcolor: "rgba(255,255,255,0.78)",
+                                    color: "#103d2b"
+                                }}
+                            />
+                        </Stack>
                     </Box>
 
                     <Grid container spacing={2}>
-                        <Grid item xs={12} md={4}>
-                            <TextField
-                                label="Your price"
-                                value={proposedSum}
-                                onChange={(e) => setProposedSum(e.target.value)}
-                                fullWidth
-                                type="number"
-                                inputProps={{ min: 0, step: "0.01" }}
-                                InputProps={{
-                                    startAdornment: <InputAdornment position="start">€</InputAdornment>,
+                        <Grid item xs={12} md={5}>
+                            <Box
+                                sx={{
+                                    height: "100%",
+                                    p: 2,
+                                    border: "1px solid rgba(15,23,42,0.08)",
+                                    background: "#fcfefd"
                                 }}
-                            />
-                            <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                                (Later this can be shown in ETH)
-                            </Typography>
+                            >
+                                <Stack spacing={1.25}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <CurrencyExchangeRoundedIcon sx={{ color: "#0f766e", fontSize: 20 }} />
+                                        <Typography sx={{ fontWeight: 800, color: "#0f172a" }}>
+                                            Offer amount
+                                        </Typography>
+                                    </Stack>
+
+                                    <TextField
+                                        label="Your proposed price"
+                                        value={proposedSum}
+                                        onChange={(e) => setProposedSum(e.target.value)}
+                                        fullWidth
+                                        type="number"
+                                        inputProps={{ min: 0, step: "0.01" }}
+                                        InputProps={{
+                                            startAdornment: <InputAdornment position="start">€</InputAdornment>,
+                                        }}
+                                    />
+
+                                    <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.7 }}>
+                                        You can match the listing budget or send your own professional offer depending on scope.
+                                    </Typography>
+                                </Stack>
+                            </Box>
                         </Grid>
 
-                        <Grid item xs={12} md={8}>
-                            <TextField
-                                label="Description"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                fullWidth
-                                multiline
-                                minRows={3}
-                                placeholder="Write a short description..."
-                            />
+                        <Grid item xs={12} md={7}>
+                            <Box
+                                sx={{
+                                    height: "100%",
+                                    p: 2,
+                                    border: "1px solid rgba(15,23,42,0.08)",
+                                    background: "#ffffff"
+                                }}
+                            >
+                                <Stack spacing={1.25} sx={{ height: "100%" }}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <NotesRoundedIcon sx={{ color: "#0f766e", fontSize: 20 }} />
+                                        <Typography sx={{ fontWeight: 800, color: "#0f172a" }}>
+                                            Project description
+                                        </Typography>
+                                    </Stack>
+
+                                    <TextField
+                                        label="Describe what you need"
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        fullWidth
+                                        multiline
+                                        minRows={6}
+                                        placeholder="Explain your task, expected outcome, tone, scope, deadlines, and any important details the provider should know before accepting."
+                                        helperText="A fuller description usually leads to a better and more accurate response."
+                                        sx={{
+                                            flex: 1,
+                                            "& .MuiInputBase-root": {
+                                                alignItems: "flex-start"
+                                            }
+                                        }}
+                                    />
+                                </Stack>
+                            </Box>
                         </Grid>
                     </Grid>
 
-                    <Divider />
+                    <Divider sx={{ borderColor: "rgba(15,23,42,0.08)" }} />
 
-                    <Box>
+                    <Box
+                        sx={{
+                            p: 2.25,
+                            border: "1px solid rgba(15,23,42,0.08)",
+                            background: "linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%)"
+                        }}
+                    >
                         <Stack
                             direction={{ xs: "column", md: "row" }}
                             spacing={2}
                             alignItems={{ xs: "stretch", md: "center" }}
                             justifyContent="space-between"
-                            sx={{ mb: 1.5 }}
+                            sx={{ mb: 1.75 }}
                         >
                             <Box>
-                                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                <Typography variant="overline" sx={{ display: "block", color: "#0f766e", fontWeight: 800, letterSpacing: 1.1, mb: 0.35 }}>
+                                    Agreement setup
+                                </Typography>
+                                <Typography variant="h6" sx={{ fontWeight: 800, color: "#0f172a" }}>
                                     Contract terms
                                 </Typography>
-                                <Typography variant="body2" sx={{ opacity: 0.72 }}>
+                                <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.7 }}>
                                     Configure each rule and the refund percent applied if it is violated.
                                 </Typography>
-                                <Typography variant="caption" sx={{ opacity: 0.62, display: "block", mt: 0.4 }}>
+                                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.6 }}>
                                     Message response remains a system rating metric and is not configurable here.
                                 </Typography>
                             </Box>
@@ -331,20 +454,21 @@ function InquiryModal({
                                 border: "1px solid rgba(15,23,42,0.12)",
                                 borderRadius: 2,
                                 overflow: "hidden",
+                                background: "#ffffff"
                             }}
                         >
-                            <Grid
+                            <Box
                                 sx={{
                                     px: 2,
-                                    py: 1.25,
-                                    bgcolor: "rgba(15,23,42,0.04)",
+                                    py: 1.5,
+                                    bgcolor: "rgba(15,23,42,0.03)",
                                     borderBottom: "1px solid rgba(15,23,42,0.08)",
                                 }}
                             >
                                 <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: 0.3, display: "block" }}>
                                     Set each rule value and the refund percent for that category.
                                 </Typography>
-                            </Grid>
+                            </Box>
 
                             {contractTermRows.map((row, index) => (
                                 <Box
@@ -352,12 +476,13 @@ function InquiryModal({
                                     sx={{
                                         px: 2,
                                         py: 2,
+                                        bgcolor: index % 2 === 0 ? "#ffffff" : "#fcfcfd"
                                     }}
                                 >
-                                    <Typography sx={{ fontWeight: 700, mb: 1.25 }}>
+                                    <Typography sx={{ fontWeight: 800, mb: 0.75, color: "#0f172a" }}>
                                         {row.title}
                                     </Typography>
-                                    <Typography variant="body2" sx={{ opacity: 0.72, mb: 1.5 }}>
+                                    <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5, lineHeight: 1.7 }}>
                                         {row.description}
                                     </Typography>
 
@@ -400,96 +525,130 @@ function InquiryModal({
                         </Box>
                     </Box>
 
-                    <Divider />
+                    <Divider sx={{ borderColor: "rgba(15,23,42,0.08)" }} />
 
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            Requirements
-                        </Typography>
-
-                        <Button onClick={addRequirement} startIcon={<AddIcon />}>
-                            Add requirement
-                        </Button>
-                    </Box>
-
-                    <Stack spacing={2}>
-                        {requirements.map((req, idx) => (
-                            <Box
-                                key={idx}
-                                sx={{
-                                    border: "1px solid rgba(0,0,0,0.12)",
-                                    borderRadius: 2,
-                                    p: 2,
-                                }}
-                            >
-                                <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}>
-                                    <Typography sx={{ fontWeight: 700 }}>
-                                        Requirement #{idx + 1}
-                                    </Typography>
-
-                                    <IconButton
-                                        onClick={() => removeRequirement(idx)}
-                                        disabled={requirements.length === 1}
-                                        size="small"
-                                        aria-label="remove requirement"
-                                    >
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                </Box>
-
-                                <Grid container spacing={2} sx={{ mt: 0.5 }}>
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            label="Requirement description"
-                                            value={req.description}
-                                            onChange={(e) => setReqField(idx, "description", e.target.value)}
-                                            fullWidth
-                                            multiline
-                                            minRows={2}
-                                            placeholder="E.g. I want X, Y, Z..."
-                                        />
-                                    </Grid>
-
-                                    <Grid item xs={12} md={3}>
-                                        <TextField
-                                            label="When you want it complete"
-                                            type="date"
-                                            value={req.forseenCompletionDate}
-                                            onChange={(e) =>
-                                                setReqField(idx, "forseenCompletionDate", e.target.value)
-                                            }
-                                            fullWidth
-                                            InputLabelProps={{ shrink: true }}
-                                        />
-                                    </Grid>
-
-                                    <Grid item xs={12} md={3}>
-                                        <Button
-                                            variant="outlined"
-                                            component="label"
-                                            fullWidth
-                                            sx={{ height: "56px" }}
-                                        >
-                                            {req.file ? "File chosen" : "Upload file"}
-                                            <input
-                                                type="file"
-                                                hidden
-                                                onChange={(e) =>
-                                                    setReqField(idx, "file", e.target.files?.[0] ?? null)
-                                                }
-                                            />
-                                        </Button>
-
-                                        {req.file && (
-                                            <Typography variant="caption" sx={{ display: "block", mt: 0.5, opacity: 0.75 }}>
-                                                {req.file.name}
-                                            </Typography>
-                                        )}
-                                    </Grid>
-                                </Grid>
+                    <Box
+                        sx={{
+                            p: 2.25,
+                            border: "1px solid rgba(15,23,42,0.08)",
+                            background: "linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%)"
+                        }}
+                    >
+                        <Stack
+                            direction={{ xs: "column", md: "row" }}
+                            spacing={2}
+                            alignItems={{ xs: "stretch", md: "center" }}
+                            justifyContent="space-between"
+                            sx={{ mb: 1.75 }}
+                        >
+                            <Box>
+                                <Typography variant="overline" sx={{ display: "block", color: "#0f766e", fontWeight: 800, letterSpacing: 1.1, mb: 0.35 }}>
+                                    Delivery requirements
+                                </Typography>
+                                <Typography variant="h6" sx={{ fontWeight: 800, color: "#0f172a" }}>
+                                    Requirements
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.7 }}>
+                                    Add the concrete requirements, target dates, and files you want the provider to review before accepting the inquiry.
+                                </Typography>
                             </Box>
-                        ))}
-                    </Stack>
+
+                            <Button
+                                onClick={addRequirement}
+                                startIcon={<AddIcon />}
+                                variant="outlined"
+                                sx={{ alignSelf: { xs: "stretch", md: "center" }, fontWeight: 800 }}
+                            >
+                            Add requirement
+                            </Button>
+                        </Stack>
+
+                        <Stack spacing={1.5}>
+                            {requirements.map((req, idx) => (
+                                <Box
+                                    key={idx}
+                                    sx={{
+                                        border: "1px solid rgba(15,23,42,0.10)",
+                                        borderRadius: 2,
+                                        p: 2,
+                                        background: idx % 2 === 0 ? "#ffffff" : "#fcfcfd",
+                                    }}
+                                >
+                                    <Stack direction="row" justifyContent="space-between" gap={2} alignItems="center">
+                                        <Box>
+                                            <Typography sx={{ fontWeight: 800, color: "#0f172a" }}>
+                                                Requirement #{idx + 1}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                                Define scope, date, and supporting file if needed.
+                                            </Typography>
+                                        </Box>
+
+                                        <IconButton
+                                            onClick={() => removeRequirement(idx)}
+                                            disabled={requirements.length === 1}
+                                            size="small"
+                                            aria-label="remove requirement"
+                                            sx={{ border: "1px solid rgba(15,23,42,0.08)" }}
+                                        >
+                                            <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                    </Stack>
+
+                                    <Grid container spacing={2} sx={{ mt: 0.25 }}>
+                                        <Grid item xs={12} md={6}>
+                                            <TextField
+                                                label="Requirement description"
+                                                value={req.description}
+                                                onChange={(e) => setReqField(idx, "description", e.target.value)}
+                                                fullWidth
+                                                multiline
+                                                minRows={3}
+                                                placeholder="E.g. I want X, Y, Z..."
+                                            />
+                                        </Grid>
+
+                                        <Grid item xs={12} md={3}>
+                                            <TextField
+                                                label="When you want it complete"
+                                                type="date"
+                                                value={req.forseenCompletionDate}
+                                                onChange={(e) =>
+                                                    setReqField(idx, "forseenCompletionDate", e.target.value)
+                                                }
+                                                fullWidth
+                                                InputLabelProps={{ shrink: true }}
+                                            />
+                                        </Grid>
+
+                                        <Grid item xs={12} md={3}>
+                                            <Button
+                                                variant="outlined"
+                                                component="label"
+                                                fullWidth
+                                                sx={{ height: "56px", fontWeight: 700 }}
+                                            >
+                                                {req.file ? "File chosen" : "Upload file"}
+                                                <input
+                                                    type="file"
+                                                    hidden
+                                                    onChange={(e) =>
+                                                        setReqField(idx, "file", e.target.files?.[0] ?? null)
+                                                    }
+                                                />
+                                            </Button>
+
+                                            {req.file && (
+                                                <Typography variant="caption" sx={{ display: "block", mt: 0.5, opacity: 0.75 }}>
+                                                    {req.file.name}
+                                                </Typography>
+                                            )}
+                                        </Grid>
+                                    </Grid>
+                                </Box>
+                            ))}
+                        </Stack>
+                    </Box>
                 </Stack>
             </DialogContent>
 
@@ -549,6 +708,7 @@ function CommentAvatar({ username, avatar }) {
 export default function Listing() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const dialog = useAppDialog();
 
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState("");
@@ -662,10 +822,10 @@ export default function Listing() {
 
             const res = await apiPostFormData("/api/Inquiries", fd);
             console.log("Created inquiry:", res);
-            alert("Inquiry sent!");
+            await dialog.alert({ variant: "success", title: "Inquiry sent", message: "Your inquiry was sent successfully." });
         } catch (e) {
             console.error(e);
-            alert(e?.message ?? "Failed to send inquiry");
+            await dialog.alert({ variant: "error", title: "Inquiry failed", message: e?.message ?? "Failed to send inquiry" });
         }
     };
 

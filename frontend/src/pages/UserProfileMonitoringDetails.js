@@ -11,6 +11,7 @@ import {
     Chip
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAppDialog } from "../components/AppDialogProvider";
 import { createDisplayNumberMap, getDisplayNumber } from "../utils/displayNames";
 
 const API_URL = "https://localhost:7278";
@@ -25,6 +26,7 @@ function ratingValue(v) {
 export default function UserProfileMonitoringDetails() {
     const { userId } = useParams();
     const navigate = useNavigate();
+    const dialog = useAppDialog();
     const token = useMemo(() => localStorage.getItem("token"), []);
 
     const [loading, setLoading] = useState(true);
@@ -83,9 +85,11 @@ export default function UserProfileMonitoringDetails() {
     }, [token, userId]);
 
     async function handleDeleteUser() {
-        const ok = window.confirm(
-            "Are you sure you want to delete this user? Related data will also be removed."
-        );
+        const ok = await dialog.confirm({
+            title: "Delete this user?",
+            message: "Related data will also be removed.",
+            confirmText: "Delete"
+        });
         if (!ok) return;
 
         try {

@@ -1,0 +1,35 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_24-601abe45806ad39a4dddb5adfcd1f21fde0d36f9",
+  "solcVersion": "0.8.24",
+  "solcLongVersion": "0.8.24+commit.e11b9ed9",
+  "userSourceNameMap": {
+    "contracts/ServiceEscrow.sol": "project/contracts/ServiceEscrow.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "shanghai",
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/ServiceEscrow.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.24;\r\n\r\ncontract ServiceEscrow {\r\n    struct Milestone {\r\n        string title;\r\n        uint256 amountWei;\r\n        bool settled;\r\n    }\r\n\r\n    struct Project {\r\n        uint256 localContractId;\r\n        address client;\r\n        address provider;\r\n        uint256 totalWei;\r\n        bool funded;\r\n        bool clientSigned;\r\n        bool providerAccepted;\r\n        uint256 settledCount;\r\n    }\r\n\r\n    uint256 public nextProjectId;\r\n    mapping(uint256 => Project) public projects;\r\n    mapping(uint256 => Milestone[]) private projectMilestones;\r\n\r\n    event ProjectCreated(\r\n        uint256 indexed projectId,\r\n        uint256 indexed localContractId,\r\n        address indexed provider\r\n    );\r\n\r\n    event ProjectFunded(\r\n        uint256 indexed projectId,\r\n        address indexed client,\r\n        uint256 totalWei\r\n    );\r\n\r\n    event MilestoneSettled(\r\n        uint256 indexed projectId,\r\n        uint256 indexed milestoneIndex,\r\n        uint256 providerAmountWei,\r\n        uint256 clientRefundAmountWei\r\n    );\r\n\r\n    function createProject(\r\n        uint256 localContractId,\r\n        address client,\r\n        address provider,\r\n        string[] calldata titles,\r\n        uint256[] calldata amountsWei\r\n    ) external returns (uint256) {\r\n        require(msg.sender == provider, \"Only provider\");\r\n        require(client != address(0), \"Bad client\");\r\n        require(provider != address(0), \"Bad provider\");\r\n        require(titles.length > 0, \"No milestones\");\r\n        require(titles.length == amountsWei.length, \"Length mismatch\");\r\n\r\n        uint256 total;\r\n        for (uint256 i = 0; i < amountsWei.length; i++) {\r\n            require(amountsWei[i] > 0, \"Bad milestone amount\");\r\n            total += amountsWei[i];\r\n        }\r\n\r\n        uint256 projectId = nextProjectId++;\r\n        projects[projectId] = Project({\r\n            localContractId: localContractId,\r\n            client: client,\r\n            provider: provider,\r\n            totalWei: total,\r\n            funded: false,\r\n            clientSigned: false,\r\n            providerAccepted: true,\r\n            settledCount: 0\r\n        });\r\n\r\n        for (uint256 i = 0; i < titles.length; i++) {\r\n            projectMilestones[projectId].push(\r\n                Milestone({\r\n                    title: titles[i],\r\n                    amountWei: amountsWei[i],\r\n                    settled: false\r\n                })\r\n            );\r\n        }\r\n\r\n        emit ProjectCreated(projectId, localContractId, provider);\r\n        return projectId;\r\n    }\r\n\r\n    function signAndFund(uint256 projectId) external payable {\r\n        Project storage p = projects[projectId];\r\n        require(msg.sender == p.client, \"Only client\");\r\n        require(!p.funded, \"Already funded\");\r\n        require(msg.value == p.totalWei, \"Wrong ETH amount\");\r\n\r\n        p.clientSigned = true;\r\n        p.funded = true;\r\n\r\n        emit ProjectFunded(projectId, msg.sender, msg.value);\r\n    }\r\n\r\n    function releaseMilestone(uint256 projectId, uint256 milestoneIndex) external {\r\n        Project storage p = projects[projectId];\r\n        require(msg.sender == p.client, \"Only client\");\r\n        require(p.funded, \"Not funded\");\r\n\r\n        Milestone storage m = projectMilestones[projectId][milestoneIndex];\r\n        require(!m.settled, \"Already settled\");\r\n\r\n        m.settled = true;\r\n        p.settledCount += 1;\r\n\r\n        payable(p.provider).transfer(m.amountWei);\r\n\r\n        emit MilestoneSettled(projectId, milestoneIndex, m.amountWei, 0);\r\n    }\r\n\r\n    function settleMilestone(\r\n        uint256 projectId,\r\n        uint256 milestoneIndex,\r\n        uint256 providerAmountWei,\r\n        uint256 clientRefundAmountWei\r\n    ) external {\r\n        Project storage p = projects[projectId];\r\n        require(msg.sender == p.client, \"Only client\");\r\n        require(p.funded, \"Not funded\");\r\n\r\n        Milestone storage m = projectMilestones[projectId][milestoneIndex];\r\n        require(!m.settled, \"Already settled\");\r\n        require(providerAmountWei + clientRefundAmountWei == m.amountWei, \"Amounts must match milestone\");\r\n\r\n        m.settled = true;\r\n        p.settledCount += 1;\r\n\r\n        if (providerAmountWei > 0) {\r\n            payable(p.provider).transfer(providerAmountWei);\r\n        }\r\n\r\n        if (clientRefundAmountWei > 0) {\r\n            payable(p.client).transfer(clientRefundAmountWei);\r\n        }\r\n\r\n        emit MilestoneSettled(projectId, milestoneIndex, providerAmountWei, clientRefundAmountWei);\r\n    }\r\n\r\n    function getMilestones(uint256 projectId) external view returns (Milestone[] memory) {\r\n        return projectMilestones[projectId];\r\n    }\r\n}"
+      }
+    }
+  }
+}

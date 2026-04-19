@@ -11,6 +11,7 @@ import {
     Typography
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAppDialog } from "../components/AppDialogProvider";
 import { createDisplayNumberMap, getDisplayNumber } from "../utils/displayNames";
 
 const API_URL = "https://localhost:7278";
@@ -18,6 +19,7 @@ const API_URL = "https://localhost:7278";
 export default function ListingMonitoringDetails() {
     const { listingId } = useParams();
     const navigate = useNavigate();
+    const dialog = useAppDialog();
     const token = useMemo(() => localStorage.getItem("token"), []);
 
     const [loading, setLoading] = useState(true);
@@ -89,10 +91,10 @@ export default function ListingMonitoringDetails() {
                 throw new Error(`${res.status} ${txt}`);
             }
 
-            alert("Listing approved.");
+            await dialog.alert({ variant: "success", title: "Listing approved", message: "The listing was approved successfully." });
             navigate("/admin/listings");
         } catch (e) {
-            alert(e?.message ?? "Approve failed");
+            await dialog.alert({ variant: "error", title: "Approval failed", message: e?.message ?? "Approve failed" });
         } finally {
             setBusy(false);
         }
@@ -101,7 +103,7 @@ export default function ListingMonitoringDetails() {
     const onReject = async () => {
         try {
             if (!comment.trim()) {
-                alert("Comment is required.");
+                await dialog.alert({ variant: "warning", title: "Comment required", message: "Comment is required." });
                 return;
             }
 
@@ -123,10 +125,10 @@ export default function ListingMonitoringDetails() {
                 throw new Error(`${res.status} ${txt}`);
             }
 
-            alert("Listing rejected.");
+            await dialog.alert({ variant: "success", title: "Listing rejected", message: "The listing was rejected successfully." });
             navigate("/admin/listings");
         } catch (e) {
-            alert(e?.message ?? "Reject failed");
+            await dialog.alert({ variant: "error", title: "Rejection failed", message: e?.message ?? "Reject failed" });
         } finally {
             setBusy(false);
         }

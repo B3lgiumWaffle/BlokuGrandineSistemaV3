@@ -304,6 +304,154 @@ public class ContractsController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("{contractId:int}/cancel-preview")]
+    public async Task<IActionResult> GetCancelPreview(int contractId, CancellationToken ct)
+    {
+        var userId = GetUserIdFromJwt();
+        if (userId == null) return Unauthorized();
+
+        var contract = await _db.b_contracts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.contractId == contractId, ct);
+
+        if (contract == null)
+            return NotFound("Contract not found.");
+
+        if (contract.fkClientUserId != userId.Value && contract.fkProviderUserId != userId.Value)
+            return Forbid();
+
+        var validationError = await ValidateContractCanBeCancelled(contract, ct);
+        if (validationError != null)
+            return BadRequest(validationError);
+
+        var refundableMilestones = await GetRefundableMilestones(contract.contractId, ct);
+
+        return Ok(new
+        {
+            contractId = contract.contractId,
+            chainProjectId = contract.chainProjectId,
+            requiresBlockchainSettlement = contract.chainProjectId.HasValue && contract.fundedAmountEth.HasValue,
+            totalClientRefundAmountEth = refundableMilestones.Sum(m => m.amountEth ?? 0m),
+            milestones = refundableMilestones.Select(m => new
+            {
+                milestoneId = m.milestoneId,
+                milestoneNo = m.milestoneNo,
+                milestoneIndex = m.milestoneNo - 1,
+                clientRefundAmountEth = m.amountEth ?? 0m
+            }).ToList()
+        });
+    }
+
+    [Authorize]
+    [HttpPost("{contractId:int}/cancel")]
+    public async Task<ActionResult<ContractDetailsDTO>> CancelContract(
+        int contractId,
+        [FromBody] CancelContractDTO? dto,
+        CancellationToken ct)
+    {
+        var userId = GetUserIdFromJwt();
+        if (userId == null) return Unauthorized();
+
+        var contract = await _db.b_contracts
+            .FirstOrDefaultAsync(c => c.contractId == contractId, ct);
+
+        if (contract == null)
+            return NotFound("Contract not found.");
+
+        if (contract.fkClientUserId != userId.Value && contract.fkProviderUserId != userId.Value)
+            return Forbid();
+
+        var validationError = await ValidateContractCanBeCancelled(contract, ct);
+        if (validationError != null)
+            return BadRequest(validationError);
+
+        var refundableMilestones = await GetRefundableMilestones(contract.contractId, ct);
+        var expectedSettlements = contract.chainProjectId.HasValue && contract.fundedAmountEth.HasValue
+            ? refundableMilestones.Where(m => (m.amountEth ?? 0m) > 0m).ToList()
+            : new List<b_contract_milestone>();
+
+        var settlementByMilestoneNo = (dto?.Settlements ?? new List<CancelContractMilestoneSettlementDTO>())
+            .GroupBy(s => s.MilestoneNo)
+            .ToDictionary(g => g.Key, g => g.Last());
+
+        foreach (var milestone in expectedSettlements)
+        {
+            if (!settlementByMilestoneNo.TryGetValue(milestone.milestoneNo, out var settlement))
+                return BadRequest($"Missing blockchain refund transaction for milestone #{milestone.milestoneNo}.");
+
+            var expectedRefund = milestone.amountEth ?? 0m;
+            if (settlement.ClientRefundAmountEth != expectedRefund)
+                return BadRequest($"Refund amount for milestone #{milestone.milestoneNo} does not match backend rules.");
+
+            if (string.IsNullOrWhiteSpace(settlement.TxHash))
+                return BadRequest($"Transaction hash is required for milestone #{milestone.milestoneNo}.");
+        }
+
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        var oldContractStatus = contract.status;
+        var now = DateTime.UtcNow;
+
+        foreach (var milestone in refundableMilestones)
+        {
+            var oldMilestoneStatus = milestone.status;
+
+            milestone.status = "Cancelled";
+            milestone.releaseTxHash = settlementByMilestoneNo.TryGetValue(milestone.milestoneNo, out var settlement)
+                ? settlement.TxHash.Trim()
+                : null;
+            milestone.releasedAt = now;
+            milestone.updatedAt = now;
+
+            _db.b_completed_list_fragment_histories.Add(new b_completed_list_fragment_history
+            {
+                fkContractId = contract.contractId,
+                milestoneIndex = milestone.milestoneNo,
+                oldStatus = oldMilestoneStatus,
+                newStatus = "Cancelled",
+                changedByUserId = userId.Value,
+                changedAt = now,
+                note = $"Contract cancelled. Milestone #{milestone.milestoneNo} refunded to client.",
+                delayInDays = 0,
+                isFinalState = true
+            });
+        }
+
+        contract.status = "Cancelled";
+        contract.updatedAt = now;
+
+        _db.b_contract_histories.Add(new b_contract_history
+        {
+            fkContractId = contract.contractId,
+            oldStatus = oldContractStatus,
+            newStatus = contract.status,
+            changedByUserId = userId.Value,
+            changedAt = now,
+            note = $"Contract cancelled. Refunded {refundableMilestones.Sum(m => m.amountEth ?? 0m)} ETH for unfinished milestone(s)."
+        });
+
+        var otherUserId = userId.Value == contract.fkClientUserId
+            ? contract.fkProviderUserId
+            : contract.fkClientUserId;
+
+        _db.b_notifications.Add(new b_notification
+        {
+            fkUserId = otherUserId,
+            title = "Contract cancelled",
+            message = $"Contract #{contract.contractId} was cancelled.",
+            type = "contract_cancelled",
+            referenceId = contract.contractId,
+            isRead = false,
+            createdAt = now
+        });
+
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+
+        return Ok(await BuildContractDetails(contract.contractId, ct));
+    }
+
+    [Authorize]
     [HttpPost("{contractId:int}/milestones/{milestoneNo:int}/released")]
     public async Task<ActionResult<ContractDetailsDTO>> SaveMilestoneReleased(
         int contractId,
@@ -372,7 +520,7 @@ public class ContractsController : ControllerBase
         if (contract.fkProviderUserId != userId.Value)
             return Forbid();
 
-        if (contract.status == "Completed" || contract.status == "Closed")
+        if (contract.status == "Completed" || contract.status == "Closed" || contract.status == "Cancelled")
             return BadRequest("Contract is already finished.");
 
         if (!contract.chainProjectId.HasValue)
@@ -409,9 +557,6 @@ public class ContractsController : ControllerBase
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
-        var oldContractStatus = contract.status;
-        var oldMilestoneStatus = milestone.status;
-
         var fragment = new b_completed_listing_fragment
         {
             fkContractId = contract.contractId,
@@ -438,29 +583,6 @@ public class ContractsController : ControllerBase
 
         contract.status = "WaitingForApproval";
         contract.updatedAt = DateTime.UtcNow;
-
-        _db.b_contract_histories.Add(new b_contract_history
-        {
-            fkContractId = contract.contractId,
-            oldStatus = oldContractStatus,
-            newStatus = contract.status,
-            changedByUserId = userId.Value,
-            changedAt = DateTime.UtcNow,
-            note = $"Provider submitted fragment for milestone #{milestone.milestoneNo}."
-        });
-
-        _db.b_completed_list_fragment_histories.Add(new b_completed_list_fragment_history
-        {
-            fkContractId = contract.contractId,
-            milestoneIndex = milestone.milestoneNo,
-            oldStatus = oldMilestoneStatus,
-            newStatus = "Submitted",
-            changedByUserId = userId.Value,
-            changedAt = DateTime.UtcNow,
-            note = $"Fragment submitted: {dto.Title.Trim()}",
-            delayInDays = 0,
-            isFinalState = false
-        });
 
         _db.b_notifications.Add(new b_notification
         {
@@ -558,6 +680,38 @@ public class ContractsController : ControllerBase
             User.FindFirstValue("sub");
 
         return int.TryParse(s, out var id) ? id : null;
+    }
+
+    private async Task<string?> ValidateContractCanBeCancelled(b_contract contract, CancellationToken ct)
+    {
+        if (string.Equals(contract.status, "Completed", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(contract.status, "Closed", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(contract.status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Contract is already finished.";
+        }
+
+        var hasSubmittedFragment = await _db.b_completed_listing_fragments
+            .AnyAsync(f =>
+                f.fkContractId == contract.contractId &&
+                f.status == "Submitted", ct);
+
+        if (hasSubmittedFragment)
+            return "Contract cannot be cancelled while a fragment is waiting for approval.";
+
+        return null;
+    }
+
+    private async Task<List<b_contract_milestone>> GetRefundableMilestones(int contractId, CancellationToken ct)
+    {
+        return await _db.b_contract_milestones
+            .Where(m =>
+                m.fkContractId == contractId &&
+                m.status != "Released" &&
+                m.status != "ReleasedPartial" &&
+                m.status != "Cancelled")
+            .OrderBy(m => m.milestoneNo)
+            .ToListAsync(ct);
     }
 
     [Authorize]

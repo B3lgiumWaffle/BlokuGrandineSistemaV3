@@ -14,6 +14,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import { useNavigate } from "react-router-dom";
+import { formatEth } from "../utils/currency";
 
 const API_URL = "https://localhost:7278";
 const trustPoints = [
@@ -22,9 +23,9 @@ const trustPoints = [
     { icon: <DatasetLinkedRoundedIcon sx={{ fontSize: 20 }} />, title: "Blockchain direction", text: "The page now better matches the platform idea instead of looking like a plain list." }
 ];
 
-const eur = (v) => {
+const eth = (v) => {
     const n = Number(v ?? 0);
-    return Number.isFinite(n) ? `${n.toFixed(0)} €` : "-";
+    return Number.isFinite(n) ? formatEth(n, { maximumFractionDigits: 0 }) : "-";
 };
 const timeAgo = (v) => {
     if (!v) return "Recently added";
@@ -225,8 +226,8 @@ function ListingCard({ item, navigate, categoryLabel, featured = false }) {
                     <Typography variant="h6" sx={{ fontWeight: 800, color: "#0f172a", lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", minHeight: 58 }}>{item.title}</Typography>
                     <Typography variant="body2" sx={{ mt: 1.25, color: "text.secondary", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", minHeight: 64 }}>{item.description || "A clearly presented digital service offer for platform users."}</Typography>
                     <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1.75, rowGap: 1 }}>
-                        <Chip size="small" icon={<CurrencyExchangeRoundedIcon sx={{ fontSize: 16 }} />} label={`From ${eur(item.priceFrom)}`} sx={{ bgcolor: "rgba(16,61,43,0.08)", fontWeight: 700 }} />
-                        <Chip size="small" label={`Up to ${eur(item.priceTo)}`} sx={{ bgcolor: "rgba(15,23,42,0.06)", fontWeight: 700 }} />
+                        <Chip size="small" icon={<CurrencyExchangeRoundedIcon sx={{ fontSize: 16 }} />} label={`From ${eth(item.priceFrom)}`} sx={{ bgcolor: "rgba(16,61,43,0.08)", fontWeight: 700 }} />
+                        <Chip size="small" label={`Up to ${eth(item.priceTo)}`} sx={{ bgcolor: "rgba(15,23,42,0.06)", fontWeight: 700 }} />
                         {item.completionTime ? <Chip size="small" icon={<BoltRoundedIcon sx={{ fontSize: 16 }} />} label={item.completionTime} sx={{ bgcolor: "rgba(27,186,120,0.12)", fontWeight: 700 }} /> : null}
                     </Stack>
                 </CardContent>
@@ -338,7 +339,7 @@ export default function Work() {
         return [
             { label: "Active listings", value: activeItems.length || 0 },
             { label: "Categories", value: new Set(activeItems.map((item) => item.categoryId)).size || 0 },
-            { label: "Average budget", value: averageBudget ? `${averageBudget} €` : "-" }
+            { label: "Average budget", value: averageBudget ? formatEth(averageBudget, { maximumFractionDigits: 0 }) : "-" }
         ];
     }, [activeItems]);
     const featuredListings = useMemo(() => pick(activeItems, (a, b) => Number(b.priceTo ?? b.priceFrom ?? 0) - Number(a.priceTo ?? a.priceFrom ?? 0), 2), [activeItems]);

@@ -1,4 +1,8 @@
-﻿const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";
+import { expireSession, getActiveToken } from "../utils/authSession";
+
+const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";
+
+const LOGIN_PATH = "/login?expired=1";
 
 async function parseResponse(res, fallbackMessage) {
     const text = await res.text().catch(() => "");
@@ -11,6 +15,13 @@ async function parseResponse(res, fallbackMessage) {
     }
 
     if (!res.ok) {
+        if (res.status === 401) {
+            expireSession("Your session expired. Please sign in again.");
+            if (window.location.pathname !== "/login") {
+                window.location.assign(LOGIN_PATH);
+            }
+        }
+
         throw new Error(
             (data && (data.message || data.title)) ||
             text ||
@@ -23,7 +34,7 @@ async function parseResponse(res, fallbackMessage) {
 }
 
 export async function apiGet(path) {
-    const token = localStorage.getItem("token");
+    const token = getActiveToken();
 
     const res = await fetch(`${API_BASE}${path}`, {
         method: "GET",
@@ -37,7 +48,7 @@ export async function apiGet(path) {
 }
 
 export async function apiDelete(path) {
-    const token = localStorage.getItem("token");
+    const token = getActiveToken();
 
     const res = await fetch(`${API_BASE}${path}`, {
         method: "DELETE",
@@ -50,7 +61,7 @@ export async function apiDelete(path) {
 }
 
 export async function apiPostNoBody(path) {
-    const token = localStorage.getItem("token");
+    const token = getActiveToken();
 
     const res = await fetch(`${API_BASE}${path}`, {
         method: "POST",
@@ -63,7 +74,7 @@ export async function apiPostNoBody(path) {
 }
 
 export async function apiPost(path, body = null) {
-    const token = localStorage.getItem("token");
+    const token = getActiveToken();
 
     const res = await fetch(`${API_BASE}${path}`, {
         method: "POST",
@@ -78,7 +89,7 @@ export async function apiPost(path, body = null) {
 }
 
 export async function apiPostJson(path, body) {
-    const token = localStorage.getItem("token");
+    const token = getActiveToken();
 
     const res = await fetch(`${API_BASE}${path}`, {
         method: "POST",
@@ -93,7 +104,7 @@ export async function apiPostJson(path, body) {
 }
 
 export async function apiPutFormData(path, formData) {
-    const token = localStorage.getItem("token");
+    const token = getActiveToken();
 
     const res = await fetch(`${API_BASE}${path}`, {
         method: "PUT",
@@ -107,7 +118,7 @@ export async function apiPutFormData(path, formData) {
 }
 
 export async function apiPostFormData(path, formData) {
-    const token = localStorage.getItem("token");
+    const token = getActiveToken();
 
     const res = await fetch(`${API_BASE}${path}`, {
         method: "POST",

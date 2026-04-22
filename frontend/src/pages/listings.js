@@ -30,6 +30,7 @@ import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAppDialog } from "../components/AppDialogProvider";
 import { apiGet, apiPostFormData } from "../api/api";
+import { formatEthRange } from "../utils/currency";
 
 function normalizeListing(raw) {
     const x = raw?.item ?? raw?.data ?? raw ?? {};
@@ -82,10 +83,7 @@ function normalizePhotos(rawPhotos) {
 }
 
 function moneyRangeText(priceFrom, priceTo) {
-    if (priceFrom != null && priceTo != null) return `€${priceFrom} – €${priceTo}`;
-    if (priceFrom != null) return `From €${priceFrom}`;
-    if (priceTo != null) return `Up to €${priceTo}`;
-    return "Not specified";
+    return formatEthRange(priceFrom, priceTo);
 }
 
 function formatDate(value) {
@@ -354,7 +352,7 @@ function InquiryModal({
                                         type="number"
                                         inputProps={{ min: 0, step: "0.01" }}
                                         InputProps={{
-                                            startAdornment: <InputAdornment position="start">€</InputAdornment>,
+                                            startAdornment: <InputAdornment position="start">ETH</InputAdornment>,
                                         }}
                                     />
 
@@ -779,7 +777,7 @@ export default function Listing() {
 
     const priceText =
         listing?.priceFrom != null || listing?.priceTo != null
-            ? `€ ${listing?.priceFrom ?? "-"} – ${listing?.priceTo ?? "-"}`
+            ? formatEthRange(listing?.priceFrom, listing?.priceTo)
             : "Price not set";
     const categoryTitle = useMemo(() => {
         const match = categories.find(

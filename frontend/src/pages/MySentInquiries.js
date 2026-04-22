@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/api";
 import { BackButton, EmptyState, PageHero, PageShell, SectionCard } from "../components/PageChrome";
 import { createDisplayNumberMap, getDisplayNumber } from "../utils/displayNames";
+import { formatEthFixed } from "../utils/currency";
 
 function normalize(raw) {
     const data = Array.isArray(raw) ? raw : raw?.items ?? raw?.data ?? [];
@@ -32,7 +33,7 @@ function normalize(raw) {
 function money(v) {
     if (v == null) return "—";
     const n = Number(v);
-    return Number.isNaN(n) ? "—" : `€${n.toFixed(2)}`;
+    return Number.isNaN(n) ? "—" : formatEthFixed(n);
 }
 
 function dateText(v) {

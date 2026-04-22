@@ -1,7 +1,8 @@
-﻿import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
+import { getActiveToken } from "../utils/authSession";
 
 function getUserRoleFromToken() {
-    const token = localStorage.getItem("token");
+    const token = getActiveToken();
     if (!token) return null;
 
     try {
@@ -17,7 +18,7 @@ function getUserRoleFromToken() {
 }
 
 export default function AdminRoute({ children }) {
-    const token = localStorage.getItem("token");
+    const token = getActiveToken();
     const role = getUserRoleFromToken();
 
     if (!token) {

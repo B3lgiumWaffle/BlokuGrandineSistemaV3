@@ -13,7 +13,7 @@ import {
     Rating
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiPostJson, apiPostNoBody } from "../api/api";
+import { apiDelete, apiGet, apiPostJson, apiPostNoBody } from "../api/api";
 import {
     createOnChainProject,
     getCurrentWalletAddress,
@@ -23,6 +23,7 @@ import {
 } from "../blockchain/escrow";
 import { useAppDialog } from "../components/AppDialogProvider";
 import { createDisplayNumberMap, formatContractLabel, formatStatusLabel, getDisplayNumber } from "../utils/displayNames";
+import { formatEth, formatEthFixed } from "../utils/currency";
 
 const DEFAULT_ESCROW_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
@@ -30,14 +31,11 @@ function money(v) {
     if (v == null || v === "") return "—";
     const n = Number(v);
     if (Number.isNaN(n)) return "—";
-    return `€${n.toFixed(2)}`;
+    return formatEthFixed(n);
 }
 
 function eth(v) {
-    if (v == null || v === "") return "—";
-    const n = Number(v);
-    if (Number.isNaN(n)) return "—";
-    return `${n} ETH`;
+    return formatEth(v);
 }
 
 function safeDate(v) {
@@ -283,6 +281,20 @@ export default function ContractDetails() {
         item.status === "PendingFunding" &&
         !busy;
 
+    const hasSubmittedFragments =
+        Array.isArray(fragmentsData?.fragments) &&
+        fragmentsData.fragments.some((fragment) => fragment.status === "Submitted");
+
+    const canCancelContract =
+        (isClient || isProvider) &&
+        item &&
+        !busy &&
+        !fragmentsBusy &&
+        item.status !== "Completed" &&
+        item.status !== "Closed" &&
+        item.status !== "Cancelled" &&
+        !hasSubmittedFragments;
+
     const canRate =
         isClient &&
         item &&
@@ -493,6 +505,69 @@ export default function ContractDetails() {
         }
     };
 
+    const onCancelContract = async () => {
+        const confirmed = await dialog.confirm({
+            title: "Cancel contract",
+            message: "Are you sure you want to cancel this contract? Completed milestones will remain paid to the provider. Unfinished funded milestones will be refunded to the client.",
+            confirmText: "Cancel contract"
+        });
+
+        if (!confirmed) return;
+
+        try {
+            setBusy(true);
+
+            const previewRaw = await apiGet(`/api/contracts/${contractId}/cancel-preview`);
+            const preview = previewRaw?.item ?? previewRaw?.data ?? previewRaw ?? {};
+            const milestones = Array.isArray(preview.milestones) ? preview.milestones : [];
+            const settlements = [];
+
+            if (preview.requiresBlockchainSettlement) {
+                if (!item?.chainProjectId) {
+                    throw new Error("Contract does not have chainProjectId yet.");
+                }
+
+                for (const milestone of milestones) {
+                    const refundAmount = Number(milestone.clientRefundAmountEth ?? 0);
+                    if (refundAmount <= 0) continue;
+
+                    const chainResult = await settleMilestoneOnChain({
+                        projectId: Number(item.chainProjectId),
+                        milestoneIndex: Number(milestone.milestoneIndex),
+                        providerAmountEth: 0,
+                        clientRefundAmountEth: refundAmount
+                    });
+
+                    settlements.push({
+                        milestoneNo: Number(milestone.milestoneNo),
+                        clientRefundAmountEth: refundAmount,
+                        txHash: chainResult.txHash
+                    });
+                }
+            }
+
+            await apiPostJson(`/api/contracts/${contractId}/cancel`, {
+                settlements
+            });
+
+            await dialog.alert({
+                variant: "success",
+                title: "Contract cancelled",
+                message: "The contract was cancelled successfully."
+            });
+            await Promise.all([load(), loadFragments(), loadMessages(), loadRating()]);
+        } catch (e) {
+            console.error(e);
+            await dialog.alert({
+                variant: "error",
+                title: "Contract cancellation failed",
+                message: e?.message ?? "Failed to cancel contract"
+            });
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const onSubmitFragment = async (milestoneNo) => {
         const formState = getSubmitForm(milestoneNo);
 
@@ -643,6 +718,38 @@ export default function ContractDetails() {
         }
     };
 
+    const onDeleteFragment = async (fragment) => {
+        const confirmed = await dialog.confirm({
+            title: "Delete fragment",
+            message: "Delete this submitted fragment? It will be removed before client approval and will not be counted in fragment history.",
+            confirmText: "Delete"
+        });
+
+        if (!confirmed) return;
+
+        try {
+            setFragmentsBusy(true);
+
+            await apiDelete(`/api/inquiries/contracts/${contractId}/fragments/${fragment.fragmentId}`);
+
+            await dialog.alert({
+                variant: "success",
+                title: "Fragment deleted",
+                message: "The submitted fragment was deleted successfully."
+            });
+            await Promise.all([load(), loadFragments(), loadMessages(), loadRating()]);
+        } catch (e) {
+            console.error(e);
+            await dialog.alert({
+                variant: "error",
+                title: "Fragment delete failed",
+                message: e?.message ?? "Failed to delete fragment"
+            });
+        } finally {
+            setFragmentsBusy(false);
+        }
+    };
+
     const onSubmitRating = async () => {
         if (!ratingValue || ratingValue < 1 || ratingValue > 5) {
             await dialog.alert({ variant: "warning", title: "Rating required", message: "Please select rating from 1 to 5." });
@@ -673,7 +780,7 @@ export default function ContractDetails() {
         if (busy || fragmentsBusy) return false;
         if (!item.chainProjectId) return false;
         if (!item.fundedAmountEth || item.status === "PendingFunding") return false;
-        if (item.status === "Completed" || item.status === "Closed") return false;
+        if (item.status === "Completed" || item.status === "Closed" || item.status === "Cancelled") return false;
         if (milestone.status === "Released" || milestone.status === "ReleasedPartial") return false;
         if (
             fragmentsData?.fragments?.some(
@@ -705,6 +812,14 @@ export default function ContractDetails() {
         if (!isProvider) return false;
         if (fragmentsBusy) return false;
         return fragment.status === "Rejected";
+    };
+
+    const canProviderDeleteFragment = (fragment) => {
+        if (!isProvider) return false;
+        if (fragmentsBusy) return false;
+        if (fragment.status !== "Submitted") return false;
+        if (fragment.approvedByUserId || fragment.approvedAt) return false;
+        return Number(fragment.submittedByUserId) === Number(currentUserId);
     };
 
     const resolveFileHref = (filePath) => {
@@ -765,6 +880,7 @@ export default function ContractDetails() {
         const canReview = canClientReviewFragment(fragment);
         const canReject = canClientRejectFragment(fragment);
         const canEscalate = canProviderAskAdmin(fragment);
+        const canDelete = canProviderDeleteFragment(fragment);
         const fileHref = resolveFileHref(fragment.filePath);
         const statusStyles = getFragmentStatusStyles(fragment.status, variant);
 
@@ -986,6 +1102,20 @@ export default function ContractDetails() {
                                 </Button>
                             </Stack>
                         )}
+
+                        {canDelete && (
+                            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="flex-end">
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    onClick={() => onDeleteFragment(fragment)}
+                                    disabled={fragmentsBusy}
+                                    sx={{ fontWeight: 800 }}
+                                >
+                                    {fragmentsBusy ? "Please wait..." : "Delete"}
+                                </Button>
+                            </Stack>
+                        )}
                     </Stack>
                 </Box>
             </Paper>
@@ -1068,6 +1198,18 @@ export default function ContractDetails() {
                                 {busy ? "Funding..." : `Sign & Fund (${eth(totalEth)})`}
                             </Button>
                         )}
+
+                        {canCancelContract && (
+                            <Button
+                                variant="outlined"
+                                color="error"
+                                onClick={onCancelContract}
+                                disabled={busy || fragmentsBusy}
+                                sx={{ fontWeight: 800 }}
+                            >
+                                {busy ? "Cancelling..." : "Cancel contract"}
+                            </Button>
+                        )}
                     </Stack>
 
                     <Divider sx={{ my: 2 }} />
@@ -1091,10 +1233,10 @@ export default function ContractDetails() {
                                             Task: {m.requirementDescription || "No task description provided."}
                                         </Typography>
                                         <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                            EUR snapshot: {money(m.amountEurSnapshot)}
+                                            Agreed amount: {money(m.amountEurSnapshot)}
                                         </Typography>
                                         <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                                            ETH amount: {eth(m.amountEth)}
+                                            On-chain amount: {eth(m.amountEth)}
                                         </Typography>
                                         <Typography variant="body2" sx={{ opacity: 0.85 }}>
                                             Status: {formatStatusLabel(m.status, "milestone")}
@@ -1411,7 +1553,7 @@ export default function ContractDetails() {
 
                             {!messagesData?.canSendMessages && (
                                 <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                                    Messages are disabled only after the contract is completed.
+                                    Messages are disabled after the contract is completed, closed, or cancelled.
                                 </Typography>
                             )}
 

@@ -122,7 +122,10 @@ contract ServiceEscrow {
         uint256 clientRefundAmountWei
     ) external {
         Project storage p = projects[projectId];
-        require(msg.sender == p.client, "Only client");
+        require(msg.sender == p.client || msg.sender == p.provider, "Only parties");
+        if (msg.sender == p.provider) {
+            require(providerAmountWei == 0, "Provider can only refund");
+        }
         require(p.funded, "Not funded");
 
         Milestone storage m = projectMilestones[projectId][milestoneIndex];

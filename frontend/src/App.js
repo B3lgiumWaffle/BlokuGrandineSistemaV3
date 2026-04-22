@@ -1,5 +1,5 @@
-﻿import { Box } from "@mui/material";
-import { Routes, Route } from "react-router-dom";
+import { Box } from "@mui/material";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 import Navbar from "./components/Navbar";
@@ -38,20 +38,66 @@ import AdminDisputes from "./pages/AdminDisputes";
 
 import MyCompletedContractsComments from "./pages/MyCompletedContractsComments";
 import ContractCommentForm from "./pages/ContractCommentForm";
+import {
+    clearSession,
+    expireSession,
+    getSessionRemainingMs,
+    installSessionFetchInterceptor,
+    isSessionExpired,
+    onSessionExpired
+} from "./utils/authSession";
 
 export default function App() {
+    const navigate = useNavigate();
     const [user, setUser] = useState(null);
 
     useEffect(() => {
+        installSessionFetchInterceptor();
+
         const saved = localStorage.getItem("user");
-        if (saved) setUser(JSON.parse(saved));
-    }, []);
+        const token = localStorage.getItem("token");
+
+        if (token && isSessionExpired()) {
+            expireSession();
+            navigate("/login?expired=1", { replace: true });
+            return;
+        }
+
+        if (saved && token) setUser(JSON.parse(saved));
+    }, [navigate]);
+
+    useEffect(() => {
+        const redirectToLogin = () => {
+            setUser(null);
+            navigate("/login?expired=1", { replace: true });
+        };
+
+        const unsubscribe = onSessionExpired(redirectToLogin);
+
+        const checkSession = () => {
+            if (isSessionExpired()) {
+                expireSession();
+            }
+        };
+
+        const timeoutId = setTimeout(checkSession, getSessionRemainingMs() + 250);
+        window.addEventListener("focus", checkSession);
+        window.addEventListener("pageshow", checkSession);
+        document.addEventListener("visibilitychange", checkSession);
+
+        return () => {
+            unsubscribe();
+            clearTimeout(timeoutId);
+            window.removeEventListener("focus", checkSession);
+            window.removeEventListener("pageshow", checkSession);
+            document.removeEventListener("visibilitychange", checkSession);
+        };
+    }, [navigate, user]);
 
     const onLogin = (u) => setUser(u);
 
     const onLogout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        clearSession();
         setUser(null);
     };
 

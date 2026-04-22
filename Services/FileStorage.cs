@@ -6,6 +6,7 @@ namespace BlokuGrandiniuSistema.Services;
 public interface IFileStorage
 {
     Task<string> SaveRequirementFileAsync(IFormFile file, CancellationToken ct = default);
+    Task DeletePublicFileAsync(string? publicPath, CancellationToken ct = default);
 }
 
 public class FileStorage : IFileStorage
@@ -43,5 +44,37 @@ public class FileStorage : IFileStorage
 
         // public url (servinamas iš wwwroot)
         return $"/uploads/requirements/{name}";
+    }
+
+    public Task DeletePublicFileAsync(string? publicPath, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(publicPath)) return Task.CompletedTask;
+
+        const string allowedPrefix = "/uploads/requirements/";
+        if (!publicPath.StartsWith(allowedPrefix, StringComparison.OrdinalIgnoreCase))
+            return Task.CompletedTask;
+
+        var fileName = Path.GetFileName(publicPath);
+        if (string.IsNullOrWhiteSpace(fileName)) return Task.CompletedTask;
+
+        var webRoot = _env.WebRootPath;
+        if (string.IsNullOrWhiteSpace(webRoot))
+            webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+
+        var abs = Path.Combine(webRoot, "uploads", "requirements", fileName);
+
+        try
+        {
+            if (File.Exists(abs))
+                File.Delete(abs);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+
+        return Task.CompletedTask;
     }
 }

@@ -23,18 +23,18 @@ public class AuthController : ControllerBase
     {
         var loginKey = (req.UsernameOrEmail ?? "").Trim();
         if (string.IsNullOrWhiteSpace(loginKey) || string.IsNullOrWhiteSpace(req.Password))
-            return BadRequest(new { message = "Užpildyk prisijungimo laukus." });
+            return BadRequest(new { message = "Fill all fields." });
 
         var user = await _db.b_users
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Username == loginKey || u.Email == loginKey);
 
         if (user == null)
-            return Unauthorized(new { message = "Neteisingi prisijungimo duomenys." });
+            return Unauthorized(new { message = "Incorect data" });
 
         var ok = BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash);
         if (!ok)
-            return Unauthorized(new { message = "Neteisingi prisijungimo duomenys." });
+            return Unauthorized(new { message = "Incorect login information" });
 
         var jwt = HttpContext.RequestServices.GetRequiredService<IConfiguration>().GetSection("Jwt");
 
@@ -88,22 +88,22 @@ public class AuthController : ControllerBase
             string.IsNullOrWhiteSpace(req.Password) ||
             string.IsNullOrWhiteSpace(req.RepeatPassword))
         {
-            return BadRequest(new { message = "Užpildyk visus laukus." });
+            return BadRequest(new { message = "Fill all fields." });
         }
 
         if (!email.Contains("@"))
-            return BadRequest(new { message = "Neteisingas el. pašto formatas." });
+            return BadRequest(new { message = "Incorect email format." });
 
         if (req.Password.Length < 6)
-            return BadRequest(new { message = "Slaptažodis turi būti bent 6 simbolių." });
+            return BadRequest(new { message = "Password needs to be atleast 6 symbols." });
 
         if (req.Password != req.RepeatPassword)
-            return BadRequest(new { message = "Slaptažodžiai nesutampa." });
+            return BadRequest(new { message = "Passwords do not match" });
 
         // 2) unikalumas (username/email)
         var exists = await _db.b_users.AnyAsync(u => u.Username == username || u.Email == email);
         if (exists)
-            return Conflict(new { message = "Toks vartotojas (username arba email) jau egzistuoja." });
+            return Conflict(new { message = "This username is taken." });
 
         // 3) rolė: default "User", bet jei ateina RoleName ir ji leistina - panaudosim
         var roleName = string.IsNullOrWhiteSpace(req.RoleName) ? "User" : req.RoleName!.Trim();
@@ -114,7 +114,7 @@ public class AuthController : ControllerBase
 
         var role = await _db.b_roles.FirstOrDefaultAsync(r => r.RoleName == roleName);
         if (role == null)
-            return BadRequest(new { message = "Nerasta nurodyta rolė." });
+            return BadRequest(new { message = "Provided role doesnt exist" });
 
         // 4) hashinam slaptažodį
         var hash = BCrypt.Net.BCrypt.HashPassword(req.Password);
@@ -133,7 +133,7 @@ public class AuthController : ControllerBase
 
         return Ok(new
         {
-            message = "Registracija sėkminga.",
+            message = "Registration succesfull",
             userId = user.UserId,
             username = user.Username,
             email = user.Email,

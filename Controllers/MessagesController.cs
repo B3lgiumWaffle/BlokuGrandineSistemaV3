@@ -126,7 +126,7 @@ public class MessagesController : ControllerBase
             return Forbid();
 
         if (!CanSendMessages(contract.status))
-            return BadRequest("Messages are disabled because the contract is already completed.");
+            return BadRequest("Messages are disabled because the contract is already finished.");
 
         var receiverUserId = contract.fkClientUserId == userId.Value
             ? contract.fkProviderUserId
@@ -229,7 +229,9 @@ public class MessagesController : ControllerBase
 
     private static bool CanSendMessages(string? contractStatus)
     {
-        return !string.Equals(contractStatus, "Completed", StringComparison.OrdinalIgnoreCase);
+        return !string.Equals(contractStatus, "Completed", StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(contractStatus, "Closed", StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(contractStatus, "Cancelled", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildUserName(b_user? user)

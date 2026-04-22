@@ -1,15 +1,22 @@
 import { useState } from "react";
 import { Alert, Box, Button, Grid, Link as MuiLink, Stack, TextField, Typography } from "@mui/material";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PageShell, SectionCard } from "../components/PageChrome";
+import { getSessionExpiredMessage, startSession } from "../utils/authSession";
 
 const API_URL = "https://localhost:7278";
 
 export default function Login({ onLogin }) {
     const navigate = useNavigate();
+    const location = useLocation();
     const [form, setForm] = useState({ usernameOrEmail: "", password: "" });
     const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
+    const [success, setSuccess] = useState(() => {
+        const params = new URLSearchParams(location.search);
+        if (!params.has("expired")) return "";
+
+        return getSessionExpiredMessage() || "Your session expired after 60 minutes. Please sign in again.";
+    });
 
     const setField = (name) => (e) => setForm((p) => ({ ...p, [name]: e.target.value }));
 
@@ -28,8 +35,7 @@ export default function Login({ onLogin }) {
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) return setError(data.message || `Error: HTTP ${res.status}`);
-            localStorage.setItem("token", data.token);
-            localStorage.setItem("user", JSON.stringify(data.user));
+            startSession(data.token, data.user);
             onLogin(data.user);
             navigate("/");
         } catch {

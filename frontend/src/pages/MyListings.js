@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/api";
 import { useAppDialog } from "../components/AppDialogProvider";
 import { BackButton, EmptyState, PageHero, PageShell, SectionCard } from "../components/PageChrome";
+import { formatEthRange } from "../utils/currency";
 
 export default function MyListings() {
     const navigate = useNavigate();
@@ -180,7 +181,7 @@ export default function MyListings() {
 
                                                     <TableCell>
                                                         {x.priceFrom != null || x.priceTo != null
-                                                            ? `${x.priceFrom ?? "-"}€ - ${x.priceTo ?? "-"}€`
+                                                            ? formatEthRange(x.priceFrom, x.priceTo)
                                                             : "-"}
                                                     </TableCell>
 

@@ -780,6 +780,82 @@ namespace BlokuGrandiniuSistema.Controllers;
         });
     }
 
+    [Authorize]
+    [HttpDelete("contracts/{contractId:int}/fragments/{fragmentId:int}")]
+    public async Task<IActionResult> DeleteSubmittedFragment(int contractId, int fragmentId, CancellationToken ct)
+    {
+        var userId = GetUserIdFromJwt();
+        if (userId == null) return Unauthorized();
+
+        var contract = await _db.b_contracts
+            .FirstOrDefaultAsync(c => c.contractId == contractId, ct);
+
+        if (contract == null) return NotFound("Contract not found.");
+
+        var fragment = await _db.b_completed_listing_fragments
+            .FirstOrDefaultAsync(f => f.fragmentId == fragmentId && f.fkContractId == contractId, ct);
+
+        if (fragment == null) return NotFound("Fragment not found.");
+
+        if (fragment.submittedByUserId != userId.Value) return Forbid();
+
+        if (!string.Equals(fragment.status, "Submitted", StringComparison.OrdinalIgnoreCase) ||
+            fragment.approvedByUserId.HasValue ||
+            fragment.approvedAt.HasValue)
+        {
+            return BadRequest("Only unreviewed submitted fragments can be deleted by the uploader.");
+        }
+
+        var milestone = await _db.b_contract_milestones
+            .FirstOrDefaultAsync(m => m.milestoneId == fragment.fkMilestoneId && m.fkContractId == contractId, ct);
+
+        if (milestone == null) return NotFound("Milestone not found.");
+
+        var filePath = fragment.filePath;
+
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        _db.b_completed_listing_fragments.Remove(fragment);
+        await _db.SaveChangesAsync(ct);
+
+        var remainingMilestoneFragments = await _db.b_completed_listing_fragments
+            .AsNoTracking()
+            .Where(f => f.fkContractId == contractId && f.fkMilestoneId == milestone.milestoneId)
+            .ToListAsync(ct);
+
+        if (remainingMilestoneFragments.Any(f =>
+                string.Equals(f.status, "Rejected", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(f.status, "Disputed", StringComparison.OrdinalIgnoreCase)))
+        {
+            milestone.status = "UnderRevision";
+        }
+        else
+        {
+            milestone.status = "Pending";
+        }
+
+        milestone.updatedAt = DateTime.UtcNow;
+
+        var milestones = await _db.b_contract_milestones
+            .Where(m => m.fkContractId == contractId)
+            .ToListAsync(ct);
+
+        contract.status = ResolveContractStatusAfterFragmentDelete(contract, milestones);
+        contract.updatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+
+        await _files.DeletePublicFileAsync(filePath, ct);
+
+        return Ok(new
+        {
+            message = "Fragment deleted successfully.",
+            contractStatus = contract.status,
+            milestoneStatus = milestone.status
+        });
+    }
+
     // ---------------------------
     // GET settlement preview before on-chain payout
     // GET api/inquiries/contracts/{contractId}/fragments/{fragmentId}/settlement-preview
@@ -914,6 +990,39 @@ namespace BlokuGrandiniuSistema.Controllers;
 
             return int.TryParse(s, out var id) ? id : null;
         }
+
+    private static string ResolveContractStatusAfterFragmentDelete(
+        b_contract contract,
+        IEnumerable<b_contract_milestone> milestones)
+    {
+        var activeMilestones = milestones.ToList();
+
+        if (activeMilestones.Any(m => string.Equals(m.status, "Submitted", StringComparison.OrdinalIgnoreCase)))
+            return "WaitingForApproval";
+
+        if (activeMilestones.Any(m => string.Equals(m.status, "UnderRevision", StringComparison.OrdinalIgnoreCase)))
+            return "UnderRevision";
+
+        var allReleased = activeMilestones.Count > 0 && activeMilestones.All(m =>
+            string.Equals(m.status, "Released", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(m.status, "ReleasedPartial", StringComparison.OrdinalIgnoreCase));
+
+        if (allReleased) return "Completed";
+
+        var anyReleased = activeMilestones.Any(m =>
+            string.Equals(m.status, "Released", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(m.status, "ReleasedPartial", StringComparison.OrdinalIgnoreCase));
+
+        if (anyReleased) return "InProgress";
+
+        if (contract.fundedAmountEth.HasValue &&
+            !string.Equals(contract.status, "PendingFunding", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Funded";
+        }
+
+        return contract.status;
+    }
 
         private async Task ApplyUpdate(b_inquiry inquiry, InquiryUpdateDTO dto, string modifiedBy, CancellationToken ct)
         {

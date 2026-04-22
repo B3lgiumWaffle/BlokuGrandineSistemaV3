@@ -20,6 +20,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiDelete, apiPutFormData, apiPostNoBody, apiPost } from "../api/api";
 import { useAppDialog } from "../components/AppDialogProvider";
 import { createDisplayNumberMap, getDisplayNumber, getInquiryStatusMeta } from "../utils/displayNames";
+import { formatEthFixed } from "../utils/currency";
 
 const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";
 
@@ -34,7 +35,7 @@ function money(v) {
     if (v == null || v === "") return "—";
     const n = Number(v);
     if (Number.isNaN(n)) return "—";
-    return `€${n.toFixed(2)}`;
+    return formatEthFixed(n);
 }
 
 function normalizeInquiry(raw) {
@@ -502,7 +503,7 @@ export default function MyInquiryDetails() {
                             <Grid container spacing={2}>
                                 <Grid item xs={12} md={4}>
                                     <TextField
-                                        label="Offer (EUR)"
+                                        label="Offer (ETH)"
                                         value={draftPrice}
                                         onChange={(e) => setDraftPrice(e.target.value)}
                                         fullWidth
@@ -510,7 +511,7 @@ export default function MyInquiryDetails() {
                                         inputProps={{ min: 0, step: "0.01" }}
                                         InputProps={{
                                             startAdornment: (
-                                                <InputAdornment position="start">€</InputAdornment>
+                                                <InputAdornment position="start">ETH</InputAdornment>
                                             ),
                                         }}
                                     />

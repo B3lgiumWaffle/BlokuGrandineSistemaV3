@@ -21,6 +21,18 @@ public class ReleaseMilestoneDTO
     public string ReleaseTxHash { get; set; } = "";
 }
 
+public class CancelContractDTO
+{
+    public List<CancelContractMilestoneSettlementDTO> Settlements { get; set; } = new();
+}
+
+public class CancelContractMilestoneSettlementDTO
+{
+    public int MilestoneNo { get; set; }
+    public decimal ClientRefundAmountEth { get; set; }
+    public string TxHash { get; set; } = "";
+}
+
 public class BlockchainMilestonePayloadDTO
 {
     public int MilestoneNo { get; set; }

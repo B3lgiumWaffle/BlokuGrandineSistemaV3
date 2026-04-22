@@ -491,7 +491,7 @@ export default function UpdateListing() {
                             <Grid container spacing={2}>
                                 <Grid item xs={12} sm={6}>
                                     <TextField
-                                        label="Price from (€)"
+                                        label="Price from (ETH)"
                                         type="number"
                                         fullWidth
                                         value={priceFrom}
@@ -501,7 +501,7 @@ export default function UpdateListing() {
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <TextField
-                                        label="Price to (€)"
+                                        label="Price to (ETH)"
                                         type="number"
                                         fullWidth
                                         value={priceTo}

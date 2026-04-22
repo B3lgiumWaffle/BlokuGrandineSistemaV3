@@ -20,13 +20,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiDelete, apiPutFormData, apiPostNoBody, apiPost } from "../api/api";
 import { useAppDialog } from "../components/AppDialogProvider";
 import { createDisplayNumberMap, getDisplayNumber, getInquiryStatusMeta } from "../utils/displayNames";
+import { formatEthFixed } from "../utils/currency";
 
 const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";
 
 function money(v) {
     if (v == null || v === "") return "—";
     const n = Number(v);
-    return Number.isNaN(n) ? "—" : `€${n.toFixed(2)}`;
+    return Number.isNaN(n) ? "—" : formatEthFixed(n);
 }
 
 function safeDate(v) {
@@ -433,13 +434,13 @@ export default function SentInquiryDetails() {
                             <Grid container spacing={2}>
                                 <Grid item xs={12} md={4}>
                                     <TextField
-                                        label="Offer (EUR)"
+                                        label="Offer (ETH)"
                                         value={draftPrice}
                                         onChange={(e) => setDraftPrice(e.target.value)}
                                         fullWidth
                                         type="number"
                                         inputProps={{ min: 0, step: "0.01" }}
-                                        InputProps={{ startAdornment: <InputAdornment position="start">€</InputAdornment> }}
+                                        InputProps={{ startAdornment: <InputAdornment position="start">ETH</InputAdornment> }}
                                     />
                                 </Grid>
                                 <Grid item xs={12} md={8}>

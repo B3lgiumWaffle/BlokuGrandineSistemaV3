@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { apiGet, apiPostJson } from "../api/api";
 import { useAppDialog } from "../components/AppDialogProvider";
 import { formatStatusLabel } from "../utils/displayNames";
+import { formatEth, formatEthFixed } from "../utils/currency";
 
 function safeDate(value) {
     if (!value) return "—";
@@ -27,14 +28,11 @@ function money(value) {
     if (value == null || value === "") return "—";
     const n = Number(value);
     if (Number.isNaN(n)) return "—";
-    return `€${n.toFixed(2)}`;
+    return formatEthFixed(n);
 }
 
 function eth(value) {
-    if (value == null || value === "") return "—";
-    const n = Number(value);
-    if (Number.isNaN(n)) return "—";
-    return `${n} ETH`;
+    return formatEth(value);
 }
 
 function resolveFileHref(filePath) {
@@ -308,7 +306,8 @@ export default function AdminDisputes() {
                                         <Typography variant="body2"><strong>Submitted:</strong> {safeDate(dispute.fragment.submittedAt)}</Typography>
                                         <Typography variant="body2"><strong>Milestone:</strong> #{dispute.milestone.milestoneNo}</Typography>
                                         <Typography variant="body2"><strong>Milestone status:</strong> {formatStatusLabel(dispute.milestone.status, "milestone")}</Typography>
-                                        <Typography variant="body2"><strong>Amount:</strong> {money(dispute.milestone.amountEurSnapshot)} / {eth(dispute.milestone.amountEth)}</Typography>
+                                        <Typography variant="body2"><strong>Agreed amount:</strong> {money(dispute.milestone.amountEurSnapshot)}</Typography>
+                                        <Typography variant="body2"><strong>On-chain amount:</strong> {eth(dispute.milestone.amountEth)}</Typography>
                                         <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                                             <strong>Description:</strong> {`\n`}{dispute.fragment.description || "—"}
                                         </Typography>

@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/api";
 import { BackButton, EmptyState, PageHero, PageShell, SectionCard } from "../components/PageChrome";
 import { createDisplayNumberMap, getDisplayNumber } from "../utils/displayNames";
+import { formatEthFixed } from "../utils/currency";
 
 /**
  * Expected API shapes supported:
@@ -76,8 +77,7 @@ function normalizeGroups(raw) {
 
 function priceText(x) {
     if (x?.proposedSum == null) return "—";
-    // Keep it simple (EUR for now)
-    return `€${Number(x.proposedSum).toFixed(2)}`;
+    return formatEthFixed(x.proposedSum);
 }
 
 function dateText(v) {

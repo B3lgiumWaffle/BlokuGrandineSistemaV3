@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import {
     Box,
     Button,
@@ -9,6 +9,8 @@ import {
     Paper,
     Stack,
     TextField,
+    Tooltip,
+    IconButton,
     Typography,
     Rating
 } from "@mui/material";
@@ -179,6 +181,104 @@ function normalizeRating(raw) {
         createdAt: x.createdAt ?? x.CreatedAt ?? null,
         updatedAt: x.updatedAt ?? x.UpdatedAt ?? null
     };
+}
+
+const SYSTEM_RATING_RULES = {
+    "Fragment speed": "On-time fragments get 2 points, late fragments get 0. The score is points sum divided by fragment count.",
+    "Revision count": "Max revisions are fragment resubmission number multiplied by milestone count. Up to 25% gets 2, up to 75% gets 1, more gets 0.",
+    "Contract speed": "Completed on or before deadline gets 2, up to 2 days late gets 1, more than 2 days late gets 0.",
+    "Message response": "Average response time up to 18 hours gets 2, up to 24 hours gets 1, over 24 hours gets 0.",
+    "Rejected fragments": "Less than the agreed allowed count gets 2, exactly the allowed count gets 1, more than allowed gets 0."
+};
+
+function parseSystemRatingReason(reason) {
+    const metricNames = Object.keys(SYSTEM_RATING_RULES);
+    const lines = String(reason || "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    return metricNames.map((name) => {
+        const line = lines.find((x) => x.toLowerCase().startsWith(`${name.toLowerCase()}:`));
+        const match = line?.match(/^[^:]+:\s*([^-\s]+)\s*-\s*(.*)$/);
+
+        return {
+            name,
+            score: match?.[1] || "—/2",
+            formula: match?.[2] || line || "No calculation details available.",
+            rule: SYSTEM_RATING_RULES[name]
+        };
+    });
+}
+
+function SystemRatingBreakdown({ ratingData, dialog }) {
+    const rows = parseSystemRatingReason(ratingData?.systemRatingReason);
+
+    return (
+        <Stack spacing={0.75}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                <Typography variant="body2" sx={{ opacity: 0.75 }}>
+                    System rating
+                </Typography>
+                <Typography sx={{ fontWeight: 800 }}>
+                    {ratingData?.systemRating ?? "—"}/5
+                </Typography>
+            </Stack>
+
+            <Stack spacing={0.75}>
+                {rows.map((row) => (
+                    <Box
+                        key={row.name}
+                        onClick={() => dialog.alert({
+                            variant: "info",
+                            title: row.name,
+                            message: row.formula
+                        })}
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 1,
+                            py: 0.75,
+                            px: 1,
+                            border: "1px solid",
+                            borderColor: "divider",
+                            bgcolor: "#ffffff",
+                            cursor: "pointer",
+                            "&:hover": {
+                                bgcolor: "#f8fafc"
+                            }
+                        }}
+                    >
+                        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 800, wordBreak: "break-word" }}>
+                                {row.name}
+                            </Typography>
+                            <Tooltip title={row.rule} arrow>
+                                <IconButton
+                                    size="small"
+                                    onClick={(e) => e.stopPropagation()}
+                                    sx={{
+                                        width: 24,
+                                        height: 24,
+                                        fontSize: 13,
+                                        fontWeight: 900,
+                                        border: "1px solid",
+                                        borderColor: "divider"
+                                    }}
+                                >
+                                    ?
+                                </IconButton>
+                            </Tooltip>
+                        </Stack>
+                        <Typography variant="body2" sx={{ fontWeight: 900, flex: "0 0 auto" }}>
+                            {row.score}
+                        </Typography>
+                    </Box>
+                ))}
+            </Stack>
+        </Stack>
+    );
 }
 
 function getCurrentUserIdFromToken() {
@@ -1648,15 +1748,7 @@ export default function ContractDetails() {
                                             bgcolor: "#f8fafc"
                                         }}
                                     >
-                                        <Typography variant="body2" sx={{ opacity: 0.75, mb: 0.75 }}>
-                                            System rating
-                                        </Typography>
-                                        <Typography sx={{ fontWeight: 800, mb: 0.5 }}>
-                                            {ratingData?.systemRating ?? "—"}/5
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ opacity: 0.8, whiteSpace: "pre-wrap" }}>
-                                            {ratingData?.systemRatingReason || "No system rating explanation available."}
-                                        </Typography>
+                                        <SystemRatingBreakdown ratingData={ratingData} dialog={dialog} />
                                     </Box>
 
                                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
@@ -1756,15 +1848,7 @@ export default function ContractDetails() {
                                             bgcolor: "#fafafa"
                                         }}
                                     >
-                                        <Typography variant="body2" sx={{ opacity: 0.75, mb: 0.5 }}>
-                                            System rating
-                                        </Typography>
-                                        <Typography sx={{ fontWeight: 800, mb: 0.5 }}>
-                                            {ratingData?.systemRating ?? "—"}/5
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ opacity: 0.8, whiteSpace: "pre-wrap" }}>
-                                            {ratingData?.systemRatingReason || "No system rating explanation available."}
-                                        </Typography>
+                                        <SystemRatingBreakdown ratingData={ratingData} dialog={dialog} />
                                     </Box>
                                 </Box>
                             ) : (

@@ -165,26 +165,6 @@ namespace BlokuGrandiniuSistema.Services
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.fkInquiryId == contract.fkInquiryId, ct);
 
-            var fragmentSpeedScore = EvaluateThreshold(
-                metrics.FragmentSpeedScore,
-                terms?.fragmentSpeedMinScore ?? 2.00m,
-                isAtLeast: true,
-                "Fragment speed");
-            var revisionScore = EvaluateThreshold(
-                metrics.RevisionCountAverage,
-                terms?.revisionCountMaxAverage ?? 3.00m,
-                isAtLeast: false,
-                "Revision count");
-            var contractSpeedScore = EvaluateThreshold(
-                metrics.ContractSpeedScore,
-                terms?.contractSpeedMinScore ?? 2.00m,
-                isAtLeast: true,
-                "Contract speed");
-            var messageResponseScore = EvaluateThreshold(
-                metrics.MessageResponseScore,
-                terms?.messageResponseMinScore ?? 2.00m,
-                isAtLeast: true,
-                "Message response");
             var rejectedFragmentsScore = EvaluateRejectedFragmentsThreshold(
                 metrics.RejectedFragmentsCount,
                 terms?.rejectedFragmentsMaxCount ?? 0);
@@ -192,21 +172,21 @@ namespace BlokuGrandiniuSistema.Services
             const decimal maxPoints = 10m;
 
             var totalPoints =
-                fragmentSpeedScore.Score +
-                revisionScore.Score +
-                contractSpeedScore.Score +
-                messageResponseScore.Score +
+                metrics.FragmentSpeedScore +
+                metrics.RevisionCountScore +
+                metrics.ContractSpeedScore +
+                metrics.MessageResponseScore +
                 rejectedFragmentsScore.Score;
 
             var finalRating = Math.Round((totalPoints / maxPoints) * 5m, 2, MidpointRounding.AwayFromZero);
 
             var reason = string.Join(Environment.NewLine, new[]
             {
-                $"Fragment speed: {metrics.FragmentSpeedScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.FragmentSpeedReason} Agreed minimum: {(terms?.fragmentSpeedMinScore ?? 2.00m).ToString(CultureInfo.InvariantCulture)}.",
-                $"Revision count: {metrics.RevisionCountScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.RevisionCountReason} Agreed maximum average rejects per milestone: {(terms?.revisionCountMaxAverage ?? 3.00m).ToString(CultureInfo.InvariantCulture)}.",
-                $"Contract speed: {metrics.ContractSpeedScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.ContractSpeedReason} Agreed minimum: {(terms?.contractSpeedMinScore ?? 2.00m).ToString(CultureInfo.InvariantCulture)}.",
-                $"Message response: {metrics.MessageResponseScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.MessageResponseReason} Agreed minimum: {(terms?.messageResponseMinScore ?? 2.00m).ToString(CultureInfo.InvariantCulture)}.",
-                $"Rejected fragments: {rejectedFragmentsScore.Score.ToString(CultureInfo.InvariantCulture)}/2 - {rejectedFragmentsScore.Reason} Rejected fragment count is {metrics.RejectedFragmentsCount}. Agreed maximum count: {(terms?.rejectedFragmentsMaxCount ?? 0).ToString(CultureInfo.InvariantCulture)}.",
+                $"Fragment speed: {metrics.FragmentSpeedScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.FragmentSpeedReason}",
+                $"Revision count: {metrics.RevisionCountScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.RevisionCountReason}",
+                $"Contract speed: {metrics.ContractSpeedScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.ContractSpeedReason}",
+                $"Message response: {metrics.MessageResponseScore.ToString(CultureInfo.InvariantCulture)}/2 - {metrics.MessageResponseReason}",
+                $"Rejected fragments: {rejectedFragmentsScore.Score.ToString(CultureInfo.InvariantCulture)}/2 - {rejectedFragmentsScore.Reason}",
                 $"Total: {totalPoints.ToString(CultureInfo.InvariantCulture)}/10",
                 $"Final system rating: {finalRating.ToString("0.00", CultureInfo.InvariantCulture)}/5.00"
             });
@@ -225,10 +205,10 @@ namespace BlokuGrandiniuSistema.Services
                     rejectedFragments = metrics.RejectedFragmentsScore,
                     thresholdScores = new
                     {
-                        fragmentSpeed = fragmentSpeedScore.Score,
-                        revisionCount = revisionScore.Score,
-                        contractSpeed = contractSpeedScore.Score,
-                        messageResponse = messageResponseScore.Score,
+                        fragmentSpeed = metrics.FragmentSpeedScore,
+                        revisionCount = metrics.RevisionCountScore,
+                        contractSpeed = metrics.ContractSpeedScore,
+                        messageResponse = metrics.MessageResponseScore,
                         rejectedFragments = rejectedFragmentsScore.Score
                     },
                     totalPoints
@@ -271,7 +251,11 @@ namespace BlokuGrandiniuSistema.Services
                 .ToListAsync(ct);
 
             var fragmentSpeedScore = CalculateFragmentSpeedScore(contract, milestones, requirements, fragments);
-            var revisionScore = CalculateRevisionScore(milestones, fragments);
+            var terms = await _db.b_inquiry_contract_terms
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.fkInquiryId == contract.fkInquiryId, ct);
+
+            var revisionScore = CalculateRevisionScore(milestones, fragments, terms?.revisionCountMaxAverage ?? 3.00m);
             var contractSpeedScore = CalculateContractSpeedScore(contract, requirements, milestones);
             var messageResponseScore = CalculateMessageResponseScore(contract, messages);
             var rejectedFragmentsScore = CalculateRejectedFragmentsScore(fragments);
@@ -300,82 +284,60 @@ namespace BlokuGrandiniuSistema.Services
             List<b_completed_listing_fragment> fragments)
         {
             var requirementById = requirements.ToDictionary(r => r.requirementId, r => r);
-            var perMilestoneScores = new List<decimal>();
+            var fragmentScores = new List<decimal>();
 
-            DateTime currentWindowStart = contract.createdAt;
-
-            foreach (var milestone in milestones.OrderBy(m => m.milestoneNo))
+            foreach (var fragment in fragments)
             {
-                DateTime? windowEnd = null;
+                var milestone = milestones.FirstOrDefault(m => m.milestoneId == fragment.fkMilestoneId);
+                DateTime? deadline = null;
 
-                if (milestone.fkRequirementId.HasValue &&
+                if (milestone?.fkRequirementId.HasValue == true &&
                     requirementById.TryGetValue(milestone.fkRequirementId.Value, out var req) &&
                     req.forseenCompletionDate.HasValue)
                 {
-                    windowEnd = req.forseenCompletionDate.Value.ToDateTime(TimeOnly.MinValue);
+                    deadline = req.forseenCompletionDate.Value.ToDateTime(TimeOnly.MinValue);
                 }
 
-                var finalFragment = fragments
-                    .Where(f => f.fkMilestoneId == milestone.milestoneId &&
-                                (f.status == "Approved" || f.status == "ApprovedPartial"))
-                    .OrderByDescending(f => f.submittedAt)
-                    .FirstOrDefault();
-
-                if (finalFragment == null || !windowEnd.HasValue)
+                if (!deadline.HasValue)
                 {
-                    perMilestoneScores.Add(0m);
+                    fragmentScores.Add(0m);
                     continue;
                 }
 
-                var totalHours = Math.Max((windowEnd.Value - currentWindowStart).TotalHours, 1);
-                var fastThreshold = currentWindowStart.AddHours(totalHours * (2d / 3d));
-
-                decimal score;
-                if (finalFragment.submittedAt <= fastThreshold) score = 2m;
-                else if (finalFragment.submittedAt <= windowEnd.Value) score = 1m;
-                else score = 0m;
-
-                perMilestoneScores.Add(score);
-                currentWindowStart = windowEnd.Value;
+                fragmentScores.Add(fragment.submittedAt <= deadline.Value ? 2m : 0m);
             }
 
-            var avg = perMilestoneScores.Count == 0 ? 0m : Math.Round(perMilestoneScores.Average(), 2);
+            var timelyCount = fragmentScores.Count(s => s == 2m);
+            var lateCount = fragmentScores.Count(s => s == 0m);
+            var sum = fragmentScores.Sum();
+            var avg = fragmentScores.Count == 0 ? 0m : Math.Round(sum / fragmentScores.Count, 2, MidpointRounding.AwayFromZero);
             return new ScorePart
             {
                 Score = avg,
-                Reason = $"Average milestone speed score is {avg.ToString("0.##", CultureInfo.InvariantCulture)} across {perMilestoneScores.Count} milestone(s)."
+                Reason = $"On-time fragments get 2 points, late fragments get 0. Formula: {sum.ToString("0.##", CultureInfo.InvariantCulture)} point(s) / {fragmentScores.Count} fragment(s) = {avg.ToString("0.##", CultureInfo.InvariantCulture)}. On time: {timelyCount}; late: {lateCount}."
             };
         }
 
         private ScorePart CalculateRevisionScore(
             List<b_contract_milestone> milestones,
-            List<b_completed_listing_fragment> fragments)
+            List<b_completed_listing_fragment> fragments,
+            decimal fragmentResubmissionNumber)
         {
-            var milestoneScores = new List<decimal>();
-            var rejectCounts = new List<int>();
+            var actualRevisionCount = CountRejectedFragments(fragments);
+            var maxRevisions = fragmentResubmissionNumber * milestones.Count;
+            var excellentLimit = Math.Round(maxRevisions * 0.25m, 0, MidpointRounding.AwayFromZero);
+            var acceptableLimit = Math.Round(maxRevisions * 0.75m, 0, MidpointRounding.AwayFromZero);
 
-            foreach (var milestone in milestones)
-            {
-                var rejectCount = fragments.Count(f =>
-                    f.fkMilestoneId == milestone.milestoneId &&
-                    string.Equals(f.status, "Rejected", StringComparison.OrdinalIgnoreCase));
-                rejectCounts.Add(rejectCount);
+            decimal score;
+            if (actualRevisionCount <= excellentLimit) score = 2m;
+            else if (actualRevisionCount <= acceptableLimit) score = 1m;
+            else score = 0m;
 
-                decimal score;
-                if (rejectCount <= 1) score = 2m;
-                else if (rejectCount == 2) score = 1m;
-                else score = 0m;
-
-                milestoneScores.Add(score);
-            }
-
-            var avg = milestoneScores.Count == 0 ? 0m : Math.Round(milestoneScores.Average(), 2);
-            var avgRejectCount = rejectCounts.Count == 0 ? 0m : Math.Round(rejectCounts.Average(x => (decimal)x), 2);
             return new ScorePart
             {
-                Score = avg,
-                RawValue = avgRejectCount,
-                Reason = $"Average rejected fragments per milestone is {avgRejectCount.ToString("0.##", CultureInfo.InvariantCulture)} across {milestoneScores.Count} milestone(s)."
+                Score = score,
+                RawValue = actualRevisionCount,
+                Reason = $"Total revisions across the whole contract: {actualRevisionCount}. Max revisions = fragment resubmission number {fragmentResubmissionNumber.ToString("0.##", CultureInfo.InvariantCulture)} * {milestones.Count} milestone(s) = {maxRevisions.ToString("0.##", CultureInfo.InvariantCulture)}. 25% limit rounded: {excellentLimit.ToString("0", CultureInfo.InvariantCulture)}; 75% limit rounded: {acceptableLimit.ToString("0", CultureInfo.InvariantCulture)}."
             };
         }
 
@@ -403,18 +365,15 @@ namespace BlokuGrandiniuSistema.Services
                 };
             }
 
-            var totalHours = Math.Max((lastDeadline.Value - contract.createdAt).TotalHours, 1);
-            var fastThreshold = contract.createdAt.AddHours(totalHours * (2d / 3d));
-
             decimal score;
-            if (completedAt.Value <= fastThreshold) score = 2m;
-            else if (completedAt.Value <= lastDeadline.Value) score = 1m;
+            if (completedAt.Value <= lastDeadline.Value) score = 2m;
+            else if (completedAt.Value <= lastDeadline.Value.AddDays(2)) score = 1m;
             else score = 0m;
 
             return new ScorePart
             {
                 Score = score,
-                Reason = $"Contract completed at {completedAt.Value:yyyy-MM-dd HH:mm:ss}, deadline was {lastDeadline.Value:yyyy-MM-dd HH:mm:ss}."
+                Reason = $"Contract completed at {completedAt.Value:yyyy-MM-dd HH:mm:ss}, deadline was {lastDeadline.Value:yyyy-MM-dd HH:mm:ss}. On or before deadline = 2; up to 2 days late = 1; more than 2 days late = 0."
             };
         }
 
@@ -456,14 +415,14 @@ namespace BlokuGrandiniuSistema.Services
             var avgHours = responseHours.Average();
 
             decimal score;
-            if (avgHours <= 12) score = 2m;
-            else if (avgHours <= 18) score = 1m;
+            if (avgHours <= 18) score = 2m;
+            else if (avgHours <= 24) score = 1m;
             else score = 0m;
 
             return new ScorePart
             {
                 Score = score,
-                Reason = $"Average provider response time is {avgHours.ToString("0.##", CultureInfo.InvariantCulture)} hour(s)."
+                Reason = $"Average provider response time is {avgHours.ToString("0.##", CultureInfo.InvariantCulture)} hour(s). Up to 18 hours = 2; up to 24 hours = 1; over 24 hours = 0."
             };
         }
 
@@ -490,29 +449,26 @@ namespace BlokuGrandiniuSistema.Services
                 string.Equals(f.status, "Rejected", StringComparison.OrdinalIgnoreCase));
         }
 
-        private static ScorePart EvaluateThreshold(decimal actualValue, decimal threshold, bool isAtLeast, string label)
-        {
-            var passed = isAtLeast ? actualValue >= threshold : actualValue <= threshold;
-
-            return new ScorePart
-            {
-                Score = passed ? 2m : 0m,
-                Reason = passed
-                    ? $"{label} met the agreed threshold."
-                    : $"{label} did not meet the agreed threshold."
-            };
-        }
-
         private static ScorePart EvaluateRejectedFragmentsThreshold(int actualCount, int maxCount)
         {
-            var passed = actualCount <= maxCount;
+            if (maxCount <= 0)
+            {
+                return new ScorePart
+                {
+                    Score = actualCount == 0 ? 2m : 0m,
+                    Reason = $"Rejected fragment count is {actualCount}. Agreed allowed count is {maxCount}. With zero allowed rejects: 0 rejected = 2; any rejected fragments = 0."
+                };
+            }
+
+            decimal score;
+            if (actualCount < maxCount) score = 2m;
+            else if (actualCount == maxCount) score = 1m;
+            else score = 0m;
 
             return new ScorePart
             {
-                Score = passed ? 2m : 0m,
-                Reason = passed
-                    ? "Rejected fragments stayed within the agreed threshold."
-                    : "Rejected fragments exceeded the agreed threshold."
+                Score = score,
+                Reason = $"Rejected fragment count is {actualCount}. Agreed allowed count is {maxCount}. Less than allowed = 2; exactly allowed = 1; more than allowed = 0."
             };
         }
 

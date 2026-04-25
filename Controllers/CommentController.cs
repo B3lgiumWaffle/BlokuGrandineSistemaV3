@@ -31,8 +31,8 @@ public class CommentController : ControllerBase
             join l in _db.b_listings.AsNoTracking() on i.fk_listingId equals l.listingId
             join client in _db.b_users.AsNoTracking() on c.fkClientUserId equals client.UserId
             join provider in _db.b_users.AsNoTracking() on c.fkProviderUserId equals provider.UserId
-            where (c.fkClientUserId == userId.Value || c.fkProviderUserId == userId.Value)
-                  && (c.status == "Closed" || c.status == "Completed")
+            where c.fkClientUserId == userId.Value
+                  && (c.status == "Closed" || c.status == "Completed" || c.status == "Cancelled" || c.status == "Canceled")
             orderby c.updatedAt descending, c.createdAt descending
             select new
             {
@@ -66,15 +66,13 @@ public class CommentController : ControllerBase
         {
             commentsByContract.TryGetValue(x.Contract.contractId, out var comment);
 
-            var isClient = x.Contract.fkClientUserId == userId.Value;
-
             return new CompletedContractCommentListItemDTO
             {
                 ContractId = x.Contract.contractId,
                 ListingId = x.ListingId,
                 ListingTitle = x.ListingTitle ?? "Untitled listing",
-                OtherPartyName = isClient ? x.ProviderName : x.ClientName,
-                MyRole = isClient ? "Client" : "Provider",
+                OtherPartyName = x.ProviderName,
+                MyRole = "Client",
                 Status = x.Contract.status,
                 HasComment = comment != null,
                 CommentText = comment?.commentText,
@@ -119,11 +117,11 @@ public class CommentController : ControllerBase
 
         var contract = contractData.Contract;
 
-        if (contract.fkClientUserId != userId.Value && contract.fkProviderUserId != userId.Value)
+        if (contract.fkClientUserId != userId.Value)
             return Forbid();
 
         if (!IsCommentableStatus(contract.status))
-            return BadRequest("Only Completed or Closed contracts can be commented.");
+            return BadRequest("Only Completed, Closed, or Cancelled contracts can be commented.");
 
         var myComment = await _db.b_comments
             .AsNoTracking()
@@ -134,15 +132,13 @@ public class CommentController : ControllerBase
             .OrderByDescending(x => x.createdAt)
             .FirstOrDefaultAsync(ct);
 
-        var isClient = contract.fkClientUserId == userId.Value;
-
         return Ok(new ContractCommentDetailsDTO
         {
             ContractId = contract.contractId,
             ListingId = contractData.ListingId,
             ListingTitle = contractData.ListingTitle ?? "Untitled listing",
-            OtherPartyName = isClient ? contractData.ProviderName : contractData.ClientName,
-            MyRole = isClient ? "Client" : "Provider",
+            OtherPartyName = contractData.ProviderName,
+            MyRole = "Client",
             Status = contract.status,
             HasComment = myComment != null,
             CommentText = myComment?.commentText,
@@ -204,11 +200,11 @@ public class CommentController : ControllerBase
 
         var contract = contractData.Contract;
 
-        if (contract.fkClientUserId != userId.Value && contract.fkProviderUserId != userId.Value)
+        if (contract.fkClientUserId != userId.Value)
             return Forbid();
 
         if (!IsCommentableStatus(contract.status))
-            return BadRequest("Only Completed or Closed contracts can be commented.");
+            return BadRequest("Only Completed, Closed, or Cancelled contracts can be commented.");
 
         var existingComment = await _db.b_comments.FirstOrDefaultAsync(
             x => x.fkContractId == contractId &&
@@ -240,10 +236,51 @@ public class CommentController : ControllerBase
         });
     }
 
+    [Authorize]
+    [HttpDelete("contract/{contractId:int}")]
+    public async Task<ActionResult> DeleteComment(int contractId, CancellationToken ct)
+    {
+        var userId = GetUserIdFromJwt();
+        if (userId == null) return Unauthorized();
+
+        var contract = await _db.b_contracts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.contractId == contractId, ct);
+
+        if (contract == null)
+            return NotFound("Contract not found.");
+
+        if (contract.fkClientUserId != userId.Value && contract.fkProviderUserId != userId.Value)
+            return Forbid();
+
+        var comment = await _db.b_comments
+            .Where(x =>
+                x.fkContractId == contractId &&
+                x.fkUserId == userId.Value &&
+                x.isVisible == true)
+            .OrderByDescending(x => x.createdAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (comment == null)
+            return NotFound("Comment not found.");
+
+        comment.isVisible = false;
+
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            message = "Comment deleted successfully.",
+            contractId
+        });
+    }
+
     private bool IsCommentableStatus(string? status)
     {
         return string.Equals(status, "Closed", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "Cancelled", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "Canceled", StringComparison.OrdinalIgnoreCase);
     }
 
     private int? GetUserIdFromJwt()

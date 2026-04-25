@@ -370,10 +370,10 @@ export default function SentInquiryDetails() {
                                 </Typography>
                             ) : (
                                 <Stack spacing={1.2}>
-                                    {item.requirements.map(r => (
+                                    {item.requirements.map((r, index) => (
                                         <Paper key={r.requirementId} variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
                                             <Typography sx={{ fontWeight: 800 }}>
-                                                Requirement
+                                                Requirement #{index + 1}
                                             </Typography>
                                             <Typography sx={{ whiteSpace: "pre-wrap", mt: 0.5 }}>
                                                 {r.description || "—"}
@@ -564,7 +564,7 @@ export default function SentInquiryDetails() {
                                     <Paper key={idx} variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
                                         <Stack direction="row" justifyContent="space-between" alignItems="center">
                                             <Typography sx={{ fontWeight: 800 }}>
-                                                Requirement {r.requirementId ? `#${r.requirementId}` : "(new)"}
+                                                Requirement #{idx + 1}
                                             </Typography>
                                             <IconButton size="small" onClick={() => removeReq(idx)} disabled={draftReqs.length === 1}>
                                                 <DeleteIcon fontSize="small" />

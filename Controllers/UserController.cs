@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using BlokuGrandiniuSistema.DTO;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 
 namespace B.Controllers
 {
@@ -14,10 +17,12 @@ namespace B.Controllers
     public class UsersController : ControllerBase
     {
         private readonly AppDbContext _db;
+        private readonly IConfiguration _configuration;
 
-        public UsersController(AppDbContext db)
+        public UsersController(AppDbContext db, IConfiguration configuration)
         {
             _db = db;
+            _configuration = configuration;
         }
 
         private int GetUserId()
@@ -37,6 +42,7 @@ namespace B.Controllers
 
             var u = await _db.b_users
                 .AsNoTracking()
+                .Include(x => x.Role)
                 .FirstOrDefaultAsync(x => x.UserId == userId);
 
             if (u == null) return NotFound("User not found.");
@@ -53,6 +59,7 @@ namespace B.Controllers
             {
                 UserId = u.UserId,
                 Username = u.Username,
+                RoleName = u.Role?.RoleName,
                 Email = u.Email,
                 FirstName = u.firstname,
                 LastName = u.lastname,
@@ -71,7 +78,9 @@ namespace B.Controllers
         {
             var userId = GetUserId();
 
-            var u = await _db.b_users.FirstOrDefaultAsync(x => x.UserId == userId);
+            var u = await _db.b_users
+                .Include(x => x.Role)
+                .FirstOrDefaultAsync(x => x.UserId == userId);
             if (u == null) return NotFound("User not found.");
 
             if (!string.IsNullOrWhiteSpace(dto.Email))
@@ -105,8 +114,55 @@ namespace B.Controllers
                 u.WalletAddress = wallet;
             }
 
+            var requestedRoleName = dto.RoleName?.Trim();
+            var currentRoleName = u.Role?.RoleName ?? "";
+
+            if (!string.IsNullOrWhiteSpace(requestedRoleName) &&
+                !string.Equals(requestedRoleName, currentRoleName, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!IsSelfServiceRole(requestedRoleName))
+                    return BadRequest("Only User and Seller roles can be selected.");
+
+                if (!IsSelfServiceRole(currentRoleName))
+                    return BadRequest("Your current role cannot be changed from profile settings.");
+
+                if (string.Equals(currentRoleName, "Seller", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(requestedRoleName, "User", StringComparison.OrdinalIgnoreCase))
+                {
+                    var roleChangeError = await ValidateProviderCanDowngradeToUser(userId);
+                    if (roleChangeError != null)
+                        return BadRequest(roleChangeError);
+                }
+
+                var targetRole = await _db.b_roles.FirstOrDefaultAsync(r => r.RoleName == requestedRoleName);
+                if (targetRole == null)
+                    return BadRequest("Selected role does not exist.");
+
+                u.RoleId = targetRole.RoleId;
+                u.Role = targetRole;
+            }
+
             await _db.SaveChangesAsync();
-            return NoContent();
+
+            var refreshedUser = await _db.b_users
+                .Include(x => x.Role)
+                .AsNoTracking()
+                .FirstAsync(x => x.UserId == userId);
+
+            var refreshedToken = BuildJwtToken(refreshedUser);
+
+            return Ok(new
+            {
+                message = "Profile updated successfully.",
+                token = refreshedToken,
+                user = new
+                {
+                    userId = refreshedUser.UserId,
+                    username = refreshedUser.Username,
+                    email = refreshedUser.Email,
+                    role = refreshedUser.Role?.RoleName
+                }
+            });
         }
 
         // PUT: /api/users/me/password
@@ -176,6 +232,85 @@ namespace B.Controllers
             await _db.SaveChangesAsync();
 
             return Ok(new { message = "Avatar updated", avatarUrl = publicUrl });
+        }
+
+        private async Task<string?> ValidateProviderCanDowngradeToUser(int userId)
+        {
+            var providerContracts = await _db.b_contracts
+                .AsNoTracking()
+                .Where(c => c.fkProviderUserId == userId)
+                .Select(c => new
+                {
+                    c.contractId,
+                    c.status
+                })
+                .ToListAsync();
+
+            var hasNonFinalStatuses = providerContracts.Any(c =>
+                !string.Equals(c.status, "Closed", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(c.status, "Cancelled", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(c.status, "Canceled", StringComparison.OrdinalIgnoreCase));
+
+            if (hasNonFinalStatuses)
+                return "You can switch to User only when all provider contracts are Closed or Cancelled.";
+
+            var closedContractIds = providerContracts
+                .Where(c => string.Equals(c.status, "Closed", StringComparison.OrdinalIgnoreCase))
+                .Select(c => c.contractId)
+                .ToList();
+
+            if (closedContractIds.Count > 0)
+            {
+                var ratedClosedContracts = await _db.b_ratings
+                    .AsNoTracking()
+                    .Where(r => closedContractIds.Contains(r.fkContractId) && r.userRating.HasValue)
+                    .Select(r => r.fkContractId)
+                    .ToListAsync();
+
+                if (ratedClosedContracts.Count != closedContractIds.Count)
+                    return "You can switch to User only when all completed provider contracts have been rated.";
+            }
+
+            var listingCount = await _db.b_listings
+                .AsNoTracking()
+                .CountAsync(l => l.userId == userId);
+
+            if (listingCount > 0)
+                return "You can switch to User only after deleting all your listings.";
+
+            return null;
+        }
+
+        private static bool IsSelfServiceRole(string? roleName)
+        {
+            return string.Equals(roleName, "User", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(roleName, "Seller", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string BuildJwtToken(b_user user)
+        {
+            var jwt = _configuration.GetSection("Jwt");
+            var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!));
+            var creds = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
+            var claims = new List<Claim>
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email),
+                new Claim("username", user.Username),
+                new Claim(ClaimTypes.Role, user.Role?.RoleName ?? "User")
+            };
+
+            var token = new JwtSecurityToken(
+                issuer: jwt["Issuer"],
+                audience: jwt["Audience"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddMinutes(int.Parse(jwt["ExpiresMinutes"]!)),
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }

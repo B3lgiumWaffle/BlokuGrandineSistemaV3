@@ -641,7 +641,7 @@ export default function MyInquiryDetails() {
                                         <Stack spacing={1}>
                                             <Stack direction="row" alignItems="center" justifyContent="space-between">
                                                 <Typography sx={{ fontWeight: 800 }}>
-                                                    Requirement {r.requirementId ? `#${r.requirementId}` : "(new)"}
+                                                    Requirement #{idx + 1}
                                                 </Typography>
 
                                                 <IconButton

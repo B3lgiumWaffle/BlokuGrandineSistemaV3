@@ -64,6 +64,7 @@ function statusColor(status) {
     const s = (status ?? "").toLowerCase();
 
     if (s === "completed" || s === "closed") return "success";
+    if (s === "cancelled" || s === "canceled") return "default";
     if (s === "funded" || s === "inprogress") return "primary";
     if (s === "pendingfunding") return "warning";
 
@@ -72,7 +73,10 @@ function statusColor(status) {
 
 function isCompletedStatus(status) {
     const normalized = (status ?? "").toLowerCase();
-    return normalized === "completed" || normalized === "closed";
+    return normalized === "completed" ||
+        normalized === "closed" ||
+        normalized === "cancelled" ||
+        normalized === "canceled";
 }
 
 function getRoleGroup(role) {

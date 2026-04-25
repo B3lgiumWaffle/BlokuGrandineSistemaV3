@@ -10,7 +10,11 @@ import {
     ListItemIcon,
     ListItemText,
     Paper,
+    MenuItem,
     Stack,
+    Select,
+    FormControl,
+    InputLabel,
     TextField,
     Typography
 } from "@mui/material";
@@ -20,6 +24,7 @@ import LockIcon from "@mui/icons-material/Lock";
 import { useNavigate } from "react-router-dom";
 import { useAppDialog } from "../components/AppDialogProvider";
 import { PageHero, PageShell, SectionCard } from "../components/PageChrome";
+import { startSession } from "../utils/authSession";
 
 export default function EditProfile() {
     const navigate = useNavigate();
@@ -35,6 +40,7 @@ export default function EditProfile() {
     const [lastName, setLastName] = useState("");
     const [website, setWebsite] = useState("");
     const [walletAddress, setWalletAddress] = useState("");
+    const [roleName, setRoleName] = useState("User");
 
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -76,6 +82,7 @@ export default function EditProfile() {
                 setEmail(data?.email ?? "");
                 setFirstName(data?.firstName ?? "");
                 setLastName(data?.lastName ?? "");
+                setRoleName(data?.roleName ?? data?.role ?? "User");
                 setWebsite(data?.website ?? "");
                 setWalletAddress(data?.walletAddress ?? "");
                 setAvatarUrl(data?.avatarUrl ?? data?.avatar ?? "");
@@ -147,6 +154,7 @@ export default function EditProfile() {
                 email: email.trim(),
                 firstName: firstName.trim(),
                 lastName: lastName.trim(),
+                roleName,
                 website: website.trim(),
                 walletAddress: walletAddress.trim()
             };
@@ -166,7 +174,12 @@ export default function EditProfile() {
                 return;
             }
 
+            const result = await res.json().catch(() => null);
+
             await uploadAvatarIfNeeded();
+            if (result?.token && result?.user) {
+                startSession(result.token, result.user);
+            }
             await dialog.alert({ variant: "success", title: "Profile updated", message: "Your profile was updated successfully." });
         } catch (e) {
             console.error(e);
@@ -326,6 +339,21 @@ export default function EditProfile() {
                                     onChange={(e) => setLastName(e.target.value)}
                                     disabled={loading}
                                 />
+                                <FormControl fullWidth disabled={loading}>
+                                    <InputLabel id="profile-role-label">Role</InputLabel>
+                                    <Select
+                                        labelId="profile-role-label"
+                                        label="Role"
+                                        value={roleName}
+                                        onChange={(e) => setRoleName(e.target.value)}
+                                    >
+                                        <MenuItem value="User">User</MenuItem>
+                                        <MenuItem value="Seller">Seller</MenuItem>
+                                    </Select>
+                                </FormControl>
+                                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                                    You can switch from Seller to User only when all seller contracts are closed or cancelled, all closed contracts are rated, and all listings are deleted.
+                                </Typography>
                                 <TextField
                                     label="Website"
                                     fullWidth

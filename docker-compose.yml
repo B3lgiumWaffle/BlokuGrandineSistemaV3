@@ -12,7 +12,7 @@ services:
       - "127.0.0.1:3306:3306"
     volumes:
       - database-data:/var/lib/mysql
-      - "./bakalauras (8).sql:/docker-entrypoint-initdb.d/01-bakalauras.sql:ro"
+      - "./bakalauras (9).sql:/docker-entrypoint-initdb.d/01-bakalauras.sql:ro"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uadmin", "-padmin"]
       interval: 10s

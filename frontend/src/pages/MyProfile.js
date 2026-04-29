@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     Avatar,
     Box,
@@ -97,7 +97,7 @@ export default function EditProfile() {
         return () => {
             alive = false;
         };
-    }, [token, navigate]);
+    }, [token, navigate, GET_ME]);
 
     const onPickAvatar = (e) => {
         const file = e.target.files?.[0] ?? null;

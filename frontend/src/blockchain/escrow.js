@@ -1,4 +1,4 @@
-﻿import { BrowserProvider, Contract, parseEther } from "ethers";
+import { BrowserProvider, Contract, parseEther } from "ethers";
 import escrowAbi from "./ServiceEscrowAbi.json";
 
 export const ESCROW_ADDRESS =
@@ -74,7 +74,7 @@ export async function createOnChainProject({
     providerWalletAddress,
     milestones
 }) {
-    const { provider, signer } = await getProviderAndSigner();
+    const { signer } = await getProviderAndSigner();
     const signerAddress = await signer.getAddress();
 
     if (signerAddress.toLowerCase() !== providerWalletAddress.toLowerCase()) {

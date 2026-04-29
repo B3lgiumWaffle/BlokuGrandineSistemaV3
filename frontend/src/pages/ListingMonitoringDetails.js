@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     Box,
     Button,
@@ -30,7 +30,7 @@ export default function ListingMonitoringDetails() {
     const [comment, setComment] = useState("");
     const [displayNumber, setDisplayNumber] = useState(null);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         try {
             setLoading(true);
             setErr("");
@@ -69,11 +69,11 @@ export default function ListingMonitoringDetails() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [listingId, token]);
 
     useEffect(() => {
         load();
-    }, [listingId, navigate, token]);
+    }, [load]);
 
     const onApprove = async () => {
         try {

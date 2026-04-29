@@ -27,6 +27,7 @@ frontend/build/
 # =========================
 *.log
 .env
+.env.local
 
 # =========================
 # OS files

@@ -4,6 +4,9 @@ import escrowAbi from "./ServiceEscrowAbi.json";
 export const ESCROW_ADDRESS =
     process.env.REACT_APP_ESCROW_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
+const HARDHAT_RPC_URL =
+    process.env.REACT_APP_HARDHAT_RPC_URL || "http://127.0.0.1:8545";
+
 if (!ESCROW_ADDRESS) {
     throw new Error("Missing REACT_APP_ESCROW_ADDRESS in .env");
 }
@@ -29,7 +32,7 @@ async function ensureLocalNetwork() {
                             symbol: "ETH",
                             decimals: 18,
                         },
-                        rpcUrls: ["http://127.0.0.1:8545"],
+                        rpcUrls: [HARDHAT_RPC_URL],
                     },
                 ],
             });

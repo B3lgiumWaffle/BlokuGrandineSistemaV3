@@ -1,0 +1,93 @@
+services:
+  database:
+    image: mariadb:10.4.32
+    container_name: bloku-grandine-database
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bakalauras
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - database-data:/var/lib/mysql
+      - "./bakalauras (8).sql:/docker-entrypoint-initdb.d/01-bakalauras.sql:ro"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uadmin", "-padmin"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    container_name: bloku-grandine-backend
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "dotnet restore BlokuGrandiniuSistema.csproj &&
+             dotnet run --project BlokuGrandiniuSistema.csproj --urls http://0.0.0.0:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ConnectionStrings__Default: Server=database;Port=3306;Database=bakalauras;User Id=admin;Password=admin;
+    ports:
+      - "8080:8080"
+    volumes:
+      - ".:/app"
+    depends_on:
+      database:
+        condition: service_healthy
+
+  frontend:
+    image: node:20
+    container_name: bloku-grandine-frontend
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm start"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      REACT_APP_API_BASE: ${REACT_APP_API_BASE:-http://localhost:8080}
+      REACT_APP_HARDHAT_RPC_URL: ${REACT_APP_HARDHAT_RPC_URL:-http://127.0.0.1:8545}
+      REACT_APP_ESCROW_ADDRESS: ${REACT_APP_ESCROW_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
+    ports:
+      - "3000:3000"
+    volumes:
+      - "./frontend:/app"
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      - backend
+
+  blockchain:
+    image: node:20
+    container_name: bloku-grandine-blockchain
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npx hardhat node --hostname 0.0.0.0"
+    ports:
+      - "8545:8545"
+    volumes:
+      - "./frontend/src/blockchain:/app"
+      - blockchain-node-modules:/app/node_modules
+
+  blockchain-deploy:
+    image: node:20
+    container_name: bloku-grandine-blockchain-deploy
+    restart: "no"
+    working_dir: /app
+    command: sh -c "sleep 8 && npm install && npx hardhat run scripts/deploy.js"
+    environment:
+      HARDHAT_RPC_URL: http://blockchain:8545
+    volumes:
+      - "./frontend/src/blockchain:/app"
+      - blockchain-node-modules:/app/node_modules
+    depends_on:
+      - blockchain
+
+volumes:
+  database-data:
+  frontend-node-modules:
+  blockchain-node-modules:

@@ -25,7 +25,7 @@ export default function AddListing() {
     const dialog = useAppDialog();
     const token = useMemo(() => localStorage.getItem("token"), []);
 
-    const API_BASE = "https://localhost:7278";
+    const API_BASE = process.env.REACT_APP_API_BASE ?? "http://localhost:8080";
 
     const [categories, setCategories] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState(null);

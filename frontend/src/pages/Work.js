@@ -16,7 +16,7 @@ import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import { useNavigate } from "react-router-dom";
 import { formatEth } from "../utils/currency";
 
-const API_URL = "https://localhost:7278";
+const API_URL = process.env.REACT_APP_API_BASE ?? "http://localhost:8080";
 const trustPoints = [
     { icon: <ShieldRoundedIcon sx={{ fontSize: 20 }} />, title: "Clearer agreements", text: "Listings, pricing, and timing are presented in a more trustworthy marketplace view." },
     { icon: <VerifiedRoundedIcon sx={{ fontSize: 20 }} />, title: "More professional discovery", text: "Clients can compare services faster through cleaner cards and stronger visual hierarchy." },

@@ -20,7 +20,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAppDialog } from "../components/AppDialogProvider";
 import { PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
-const API_URL = "https://localhost:7278";
+const API_URL = process.env.REACT_APP_API_BASE ?? "http://localhost:8080";
 
 export default function UpdateListing() {
     const navigate = useNavigate();

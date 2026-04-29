@@ -62,7 +62,7 @@ services:
       - backend
 
   blockchain:
-    image: node:20
+    image: node:22
     container_name: bloku-grandine-blockchain
     restart: unless-stopped
     working_dir: /app
@@ -74,7 +74,7 @@ services:
       - blockchain-node-modules:/app/node_modules
 
   blockchain-deploy:
-    image: node:20
+    image: node:22
     container_name: bloku-grandine-blockchain-deploy
     restart: "no"
     working_dir: /app

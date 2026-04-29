@@ -49,7 +49,7 @@ export default function EditProfile() {
     const [avatarUrl, setAvatarUrl] = useState("");
     const [avatarFile, setAvatarFile] = useState(null);
 
-    const API_BASE = "https://localhost:7278";
+    const API_BASE = process.env.REACT_APP_API_BASE ?? "http://localhost:8080";
     const GET_ME = `${API_BASE}/api/users/me`;
     const PUT_ME = `${API_BASE}/api/users/me`;
     const UPLOAD_AVATAR = `${API_BASE}/api/users/me/avatar`;

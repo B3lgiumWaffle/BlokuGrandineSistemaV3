@@ -688,7 +688,7 @@ export default function ContractDetails() {
             }
 
             const res = await fetch(
-                `https://localhost:7278/api/contracts/${contractId}/milestones/${milestoneNo}/submit-fragment`,
+                `${process.env.REACT_APP_API_BASE ?? "http://localhost:8080"}/api/contracts/${contractId}/milestones/${milestoneNo}/submit-fragment`,
                 {
                     method: "POST",
                     headers: {
@@ -925,7 +925,7 @@ export default function ContractDetails() {
     const resolveFileHref = (filePath) => {
         if (!filePath) return null;
         if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
-        return `https://localhost:7278${filePath}`;
+        return `${process.env.REACT_APP_API_BASE ?? "http://localhost:8080"}${filePath}`;
     };
 
     const getFragmentStatusColor = (status) => {

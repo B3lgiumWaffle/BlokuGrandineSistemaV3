@@ -74,7 +74,7 @@ export default function MyListings() {
 
         try {
             const res = await fetch(
-                `https://localhost:7278/api/listings/${listingId}`,
+                `${process.env.REACT_APP_API_BASE ?? "http://localhost:8080"}/api/listings/${listingId}`,
                 {
                     method: "DELETE",
                     headers: {

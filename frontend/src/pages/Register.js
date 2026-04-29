@@ -3,7 +3,7 @@ import { Alert, Box, Button, Grid, Link as MuiLink, Stack, TextField, Typography
 import { Link } from "react-router-dom";
 import { PageShell, SectionCard } from "../components/PageChrome";
 
-const API_URL = "https://localhost:7278";
+const API_URL = process.env.REACT_APP_API_BASE ?? "http://localhost:8080";
 
 export default function Register() {
     const [form, setForm] = useState({ username: "", email: "", password: "", repeatPassword: "" });

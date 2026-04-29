@@ -5,7 +5,7 @@ import NotificationsIcon from "@mui/icons-material/Notifications";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 
-const API_URL = "https://localhost:7278";
+const API_URL = process.env.REACT_APP_API_BASE ?? "http://localhost:8080";
 
 export default function Navbar({ user, onLogout }) {
     const location = useLocation();

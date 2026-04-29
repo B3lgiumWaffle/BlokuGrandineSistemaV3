@@ -38,7 +38,7 @@ function eth(value) {
 function resolveFileHref(filePath) {
     if (!filePath) return null;
     if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
-    return `https://localhost:7278${filePath}`;
+    return `${process.env.REACT_APP_API_BASE ?? "http://localhost:8080"}${filePath}`;
 }
 
 export default function AdminDisputes() {

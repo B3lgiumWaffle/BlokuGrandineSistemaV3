@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PageShell, SectionCard } from "../components/PageChrome";
 import { getSessionExpiredMessage, startSession } from "../utils/authSession";
 
-const API_URL = "https://localhost:7278";
+const API_URL = process.env.REACT_APP_API_BASE ?? "http://localhost:8080";
 
 export default function Login({ onLogin }) {
     const navigate = useNavigate();

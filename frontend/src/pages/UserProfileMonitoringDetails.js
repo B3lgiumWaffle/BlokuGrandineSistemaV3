@@ -14,7 +14,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAppDialog } from "../components/AppDialogProvider";
 import { createDisplayNumberMap, getDisplayNumber } from "../utils/displayNames";
 
-const API_URL = "https://localhost:7278";
+const API_URL = process.env.REACT_APP_API_BASE ?? "http://localhost:8080";
 
 function ratingValue(v) {
     if (v === null || v === undefined) return "—";

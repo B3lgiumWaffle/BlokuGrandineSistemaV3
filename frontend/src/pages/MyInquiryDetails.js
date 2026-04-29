@@ -22,7 +22,7 @@ import { useAppDialog } from "../components/AppDialogProvider";
 import { createDisplayNumberMap, getDisplayNumber, getInquiryStatusMeta } from "../utils/displayNames";
 import { formatEthFixed } from "../utils/currency";
 
-const API_BASE = process.env.REACT_APP_API_BASE ?? "https://localhost:7278";
+const API_BASE = process.env.REACT_APP_API_BASE ?? "http://localhost:8080";
 
 function safeDate(v) {
     if (!v) return "—";

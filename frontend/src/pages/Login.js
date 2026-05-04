@@ -63,6 +63,11 @@ export default function Login({ onLogin }) {
                         <Box component="form" onSubmit={onSubmit}>
                             <TextField fullWidth label="Email or username" margin="normal" value={form.usernameOrEmail} onChange={setField("usernameOrEmail")} />
                             <TextField fullWidth label="Password" type="password" margin="normal" value={form.password} onChange={setField("password")} />
+                            <Box sx={{ mt: 1, textAlign: "right" }}>
+                                <MuiLink component={Link} to="/forgot-password" underline="hover" sx={{ fontWeight: 700 }}>
+                                    Forgot password? Click here
+                                </MuiLink>
+                            </Box>
                             <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>Sign in</Button>
                             <Typography variant="body2" sx={{ mt: 2, textAlign: "center", color: "text.secondary" }}>
                                 Need an account?{" "}

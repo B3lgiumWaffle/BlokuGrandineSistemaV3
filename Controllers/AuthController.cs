@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using BlokuGrandiniuSistema.DTO;
 using BlokuGrandiniuSistema.Models;
+using BlokuGrandiniuSistema.Services;
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -16,7 +17,18 @@ namespace YourNamespace.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly AppDbContext _db;
-    public AuthController(AppDbContext db) => _db = db;
+    private readonly IPasswordResetEmailSender _passwordResetEmailSender;
+    private readonly IConfiguration _configuration;
+
+    public AuthController(
+        AppDbContext db,
+        IPasswordResetEmailSender passwordResetEmailSender,
+        IConfiguration configuration)
+    {
+        _db = db;
+        _passwordResetEmailSender = passwordResetEmailSender;
+        _configuration = configuration;
+    }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest req)
@@ -73,6 +85,59 @@ public class AuthController : ControllerBase
                 role = user.Role!.RoleName
             }
         });
+    }
+
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest req)
+    {
+        var email = (req.Email ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains("@"))
+            return BadRequest(new { message = "Enter a valid email address." });
+
+        var user = await _db.b_users.FirstOrDefaultAsync(u => u.Email == email);
+        if (user == null)
+            return Ok(new { message = "If this email exists, a password reset link has been sent." });
+
+        var token = CreateResetToken(user);
+
+        var frontendBaseUrl = Environment.GetEnvironmentVariable("FRONTEND_BASE_URL")
+            ?? _configuration["App:FrontendBaseUrl"]
+            ?? "http://localhost:3000";
+
+        var resetLink = $"{frontendBaseUrl.TrimEnd('/')}/reset-password?token={Uri.EscapeDataString(token)}";
+        await _passwordResetEmailSender.SendPasswordResetEmailAsync(user.Email, resetLink);
+
+        return Ok(new { message = "If this email exists, a password reset link has been sent." });
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest req)
+    {
+        var token = (req.Token ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(token))
+            return BadRequest(new { message = "Password reset link is invalid." });
+
+        if (string.IsNullOrWhiteSpace(req.NewPassword) || string.IsNullOrWhiteSpace(req.RepeatPassword))
+            return BadRequest(new { message = "Fill all fields." });
+
+        if (req.NewPassword.Length < 6)
+            return BadRequest(new { message = "Password needs to be atleast 6 symbols." });
+
+        if (req.NewPassword != req.RepeatPassword)
+            return BadRequest(new { message = "Passwords do not match" });
+
+        var userId = ValidateResetToken(token);
+        if (userId == null)
+            return BadRequest(new { message = "Password reset link is invalid or has expired." });
+
+        var user = await _db.b_users.FirstOrDefaultAsync(u => u.UserId == userId.Value);
+        if (user == null)
+            return BadRequest(new { message = "Password reset link is invalid or has expired." });
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "Password updated successfully. You can now sign in." });
     }
 
 
@@ -139,6 +204,63 @@ public class AuthController : ControllerBase
             email = user.Email,
             role = role.RoleName
         });
+    }
+
+    private string CreateResetToken(b_user user)
+    {
+        var jwt = _configuration.GetSection("Jwt");
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!));
+        var creds = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
+        var claims = new List<Claim>
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+            new Claim("purpose", "password_reset")
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: jwt["Issuer"],
+            audience: jwt["Audience"],
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(1),
+            signingCredentials: creds
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private int? ValidateResetToken(string token)
+    {
+        var jwt = _configuration.GetSection("Jwt");
+        var tokenHandler = new JwtSecurityTokenHandler();
+
+        try
+        {
+            var principal = tokenHandler.ValidateToken(token, new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = jwt["Issuer"],
+                ValidateAudience = true,
+                ValidAudience = jwt["Audience"],
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!)),
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromSeconds(30)
+            }, out _);
+
+            var purpose = principal.FindFirst("purpose")?.Value;
+            var userIdValue = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (purpose != "password_reset" || !int.TryParse(userIdValue, out var userId))
+                return null;
+
+            return userId;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     }

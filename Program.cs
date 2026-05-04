@@ -6,11 +6,15 @@ using BlokuGrandiniuSistema.Services;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+LoadDotEnv(Path.Combine(builder.Environment.ContentRootPath, ".env"));
+LoadDotEnv(Path.Combine(builder.Environment.ContentRootPath, ".env.local"));
+LoadDotEnv(Path.Combine(builder.Environment.ContentRootPath, "frontend", ".env.local"));
 
 // ---------- SERVICES (VISKAS PRIEŠ builder.Build()) ----------
 builder.Services.AddControllers();
 builder.Services.AddScoped<IFileStorage, FileStorage>();
 builder.Services.AddScoped<IValuationService, ValuationService>();
+builder.Services.AddHttpClient<IPasswordResetEmailSender, ResendPasswordResetEmailSender>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -76,3 +80,23 @@ app.UseStaticFiles();
 app.MapControllers();
 
 app.Run();
+
+static void LoadDotEnv(string path)
+{
+    if (!File.Exists(path)) return;
+
+    foreach (var rawLine in File.ReadAllLines(path))
+    {
+        var line = rawLine.Trim();
+        if (line.Length == 0 || line.StartsWith("#")) continue;
+
+        var separatorIndex = line.IndexOf('=');
+        if (separatorIndex <= 0) continue;
+
+        var key = line[..separatorIndex].Trim();
+        var value = line[(separatorIndex + 1)..].Trim().Trim('"');
+
+        if (string.IsNullOrWhiteSpace(key)) continue;
+        Environment.SetEnvironmentVariable(key, value);
+    }
+}

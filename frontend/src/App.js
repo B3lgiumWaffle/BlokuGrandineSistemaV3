@@ -11,6 +11,8 @@ import Work from "./pages/Work";
 import About from "./pages/About";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 import MyListings from "./pages/MyListings";
 import AddListing from "./pages/AddListing";
@@ -119,6 +121,8 @@ export default function App() {
                         <Route path="/about" element={<About />} />
                         <Route path="/login" element={<Login onLogin={onLogin} />} />
                         <Route path="/register" element={<Register />} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/reset-password" element={<ResetPassword />} />
 
                         <Route path="/my-listings" element={<MyListings />} />
                         <Route path="/my-listings/new" element={<AddListing />} />

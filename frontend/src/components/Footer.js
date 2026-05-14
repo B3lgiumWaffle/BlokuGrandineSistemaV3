@@ -23,6 +23,7 @@ export default function Footer() {
                             <MuiLink component={Link} to="/work" underline="hover" color="inherit">Marketplace</MuiLink>
                             <MuiLink component={Link} to="/my-contracts" underline="hover" color="inherit">Contracts</MuiLink>
                             <MuiLink component={Link} to="/about" underline="hover" color="inherit">About</MuiLink>
+                            <MuiLink component={Link} to="/terms" underline="hover" color="inherit">Terms of Service</MuiLink>
                         </Stack>
                     </Grid>
 
@@ -40,7 +41,9 @@ export default function Footer() {
 
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between">
                     <Typography sx={{ color: "rgba(226,232,240,0.60)" }}>© {year} Blockchain Service Platform</Typography>
-                    <Typography sx={{ color: "rgba(226,232,240,0.60)" }}>Professional freelance workflow demo</Typography>
+                    <MuiLink component={Link} to="/terms" underline="hover" color="inherit" sx={{ color: "rgba(226,232,240,0.72)" }}>
+                        Terms of Service
+                    </MuiLink>
                 </Stack>
             </Container>
         </Box>

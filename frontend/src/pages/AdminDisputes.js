@@ -16,6 +16,7 @@ import { apiGet, apiPostJson } from "../api/api";
 import { useAppDialog } from "../components/AppDialogProvider";
 import { formatStatusLabel } from "../utils/displayNames";
 import { formatEth, formatEthFixed } from "../utils/currency";
+import { settleMilestoneOnChain } from "../blockchain/escrow";
 
 function safeDate(value) {
     if (!value) return "—";
@@ -132,7 +133,7 @@ export default function AdminDisputes() {
         const confirmed = await dialog.confirm({
             title: isApprove ? "Approve dispute" : "Reject dispute",
             message: isApprove
-                ? "Are you sure you want to approve this disputed fragment?"
+                ? "Are you sure you want to approve this disputed fragment and release escrow funds to the provider?"
                 : "Are you sure you want to keep this disputed fragment rejected?",
             confirmText: isApprove ? "Approve" : "Reject"
         });
@@ -142,15 +143,34 @@ export default function AdminDisputes() {
         try {
             setBusy(true);
 
-            await apiPostJson(`/api/admin/disputes/${selectedId}/${decision}`, {
-                reviewComment: adminComment.trim()
-            });
+            if (isApprove) {
+                const previewRaw = await apiGet(`/api/admin/disputes/${selectedId}/settlement-preview`);
+                const settlement = previewRaw?.item ?? previewRaw?.data ?? previewRaw ?? {};
+
+                const chainResult = await settleMilestoneOnChain({
+                    projectId: Number(settlement.chainProjectId),
+                    milestoneIndex: Number(settlement.milestoneIndex),
+                    providerAmountEth: Number(settlement.providerAmountEth),
+                    clientRefundAmountEth: Number(settlement.clientRefundAmountEth)
+                });
+
+                await apiPostJson(`/api/admin/disputes/${selectedId}/${decision}`, {
+                    reviewComment: adminComment.trim(),
+                    releaseTxHash: chainResult.txHash,
+                    providerAmountEth: Number(settlement.providerAmountEth),
+                    clientRefundAmountEth: Number(settlement.clientRefundAmountEth)
+                });
+            } else {
+                await apiPostJson(`/api/admin/disputes/${selectedId}/${decision}`, {
+                    reviewComment: adminComment.trim()
+                });
+            }
 
             await dialog.alert({
                 variant: "success",
                 title: "Dispute resolved",
                 message: isApprove
-                    ? "Disputed fragment was approved successfully."
+                    ? "Disputed fragment was approved and escrow funds were released."
                     : "Disputed fragment was left rejected successfully."
             });
 

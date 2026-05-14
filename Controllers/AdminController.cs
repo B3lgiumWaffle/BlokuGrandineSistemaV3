@@ -585,6 +585,51 @@ public class AdminController : ControllerBase
         });
     }
 
+    [HttpGet("disputes/{fragmentId:int}/settlement-preview")]
+    public async Task<IActionResult> GetDisputeSettlementPreview(int fragmentId, CancellationToken ct)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var fragment = await _db.b_completed_listing_fragments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(f => f.fragmentId == fragmentId, ct);
+
+        if (fragment == null) return NotFound("Fragment not found.");
+        if (!string.Equals(fragment.status, "Disputed", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Only disputed fragments can be settled by administrator.");
+
+        var contract = await _db.b_contracts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.contractId == fragment.fkContractId, ct);
+
+        if (contract == null) return NotFound("Contract not found.");
+
+        if (!contract.chainProjectId.HasValue || !contract.fundedAmountEth.HasValue)
+            return BadRequest("Contract must be funded on-chain before administrator can release disputed funds.");
+
+        var milestone = await _db.b_contract_milestones
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.milestoneId == fragment.fkMilestoneId && m.fkContractId == contract.contractId, ct);
+
+        if (milestone == null) return NotFound("Milestone not found.");
+
+        var amountEth = milestone.amountEth ?? 0m;
+
+        return Ok(new
+        {
+            contractId = contract.contractId,
+            fragmentId = fragment.fragmentId,
+            chainProjectId = contract.chainProjectId,
+            milestoneId = milestone.milestoneId,
+            milestoneNo = milestone.milestoneNo,
+            milestoneIndex = milestone.milestoneNo - 1,
+            fullAmountEth = amountEth,
+            providerAmountEth = amountEth,
+            clientRefundAmountEth = 0m,
+            reason = "Administrator approved the dispute, so the full milestone escrow amount will be released to the provider."
+        });
+    }
+
     [HttpPost("disputes/{fragmentId:int}/approve")]
     public async Task<IActionResult> ApproveDispute(int fragmentId, [FromBody] AdminResolveDisputeDTO? dto, CancellationToken ct)
     {
@@ -610,10 +655,27 @@ public class AdminController : ControllerBase
 
         if (milestone == null) return NotFound("Milestone not found.");
 
+        if (!contract.chainProjectId.HasValue || !contract.fundedAmountEth.HasValue)
+            return BadRequest("Contract must be funded on-chain before administrator can release disputed funds.");
+
+        var expectedProviderAmountEth = milestone.amountEth ?? 0m;
+        var expectedClientRefundAmountEth = 0m;
+
+        if (dto == null || string.IsNullOrWhiteSpace(dto.ReleaseTxHash))
+            return BadRequest("ReleaseTxHash is required after administrator on-chain settlement.");
+
+        if (dto.ProviderAmountEth != expectedProviderAmountEth ||
+            dto.ClientRefundAmountEth != expectedClientRefundAmountEth)
+        {
+            return BadRequest("Settlement amounts do not match administrator dispute rules.");
+        }
+
+        var txHash = dto.ReleaseTxHash.Trim();
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
         var oldFragmentStatus = fragment.status;
         var oldContractStatus = contract.status;
+        var oldMilestoneStatus = milestone.status;
         var competingFragments = await _db.b_completed_listing_fragments
             .Where(f =>
                 f.fkContractId == contract.contractId &&
@@ -622,20 +684,32 @@ public class AdminController : ControllerBase
                 (f.status == "Submitted" || f.status == "Disputed"))
             .ToListAsync(ct);
 
-        fragment.status = "Submitted";
+        fragment.status = "Approved";
         fragment.approvedByUserId = adminUserId.Value;
         fragment.approvedAt = DateTime.UtcNow;
-        fragment.releaseTxHash = null;
+        fragment.releaseTxHash = txHash;
         fragment.updatedAt = DateTime.UtcNow;
         fragment.reviewComment = AppendAuditNote(
             fragment.reviewComment,
             string.IsNullOrWhiteSpace(dto?.ReviewComment)
-                ? "Administrator approved the disputed fragment and returned it to the client for final approval."
-                : $"Administrator approved the disputed fragment and returned it to the client for final approval. {dto!.ReviewComment!.Trim()}");
+                ? "Administrator approved the disputed fragment and released escrow funds to the provider."
+                : $"Administrator approved the disputed fragment and released escrow funds to the provider. {dto!.ReviewComment!.Trim()}");
 
-        milestone.status = "WaitingForApproval";
+        milestone.status = "Released";
+        milestone.releaseTxHash = txHash;
+        milestone.releasedAt = DateTime.UtcNow;
         milestone.updatedAt = DateTime.UtcNow;
-        contract.status = "WaitingForApproval";
+
+        await _db.SaveChangesAsync(ct);
+
+        var remaining = await _db.b_contract_milestones
+            .CountAsync(m =>
+                m.fkContractId == contract.contractId &&
+                m.status != "Released" &&
+                m.status != "ReleasedPartial" &&
+                m.status != "Cancelled", ct);
+
+        contract.status = remaining == 0 ? "Completed" : "InProgress";
         contract.updatedAt = DateTime.UtcNow;
 
         _db.b_contract_histories.Add(new b_contract_history
@@ -645,7 +719,22 @@ public class AdminController : ControllerBase
             newStatus = contract.status,
             changedByUserId = adminUserId.Value,
             changedAt = DateTime.UtcNow,
-            note = $"Administrator approved disputed fragment #{fragment.fragmentId} and returned it to the client for final approval."
+            note = $"Administrator approved disputed fragment #{fragment.fragmentId} and released milestone #{milestone.milestoneNo} escrow funds to the provider."
+        });
+
+        _db.b_completed_list_fragment_histories.Add(new b_completed_list_fragment_history
+        {
+            fkContractId = contract.contractId,
+            milestoneIndex = milestone.milestoneNo,
+            oldStatus = oldMilestoneStatus,
+            newStatus = "Released",
+            changedByUserId = adminUserId.Value,
+            changedAt = DateTime.UtcNow,
+            note = string.IsNullOrWhiteSpace(dto?.ReviewComment)
+                ? "Administrator approved disputed fragment and released escrow funds to the provider."
+                : $"Administrator approved disputed fragment and released escrow funds to the provider. {dto!.ReviewComment!.Trim()}",
+            delayInDays = 0,
+            isFinalState = true
         });
 
         _db.b_completed_list_fragment_histories.Add(new b_completed_list_fragment_history
@@ -653,14 +742,12 @@ public class AdminController : ControllerBase
             fkContractId = contract.contractId,
             milestoneIndex = milestone.milestoneNo,
             oldStatus = oldFragmentStatus,
-            newStatus = "Submitted",
+            newStatus = "Approved",
             changedByUserId = adminUserId.Value,
             changedAt = DateTime.UtcNow,
-            note = string.IsNullOrWhiteSpace(dto?.ReviewComment)
-                ? "Administrator approved disputed fragment and returned it to the client for final approval."
-                : $"Administrator approved disputed fragment and returned it to the client for final approval. {dto!.ReviewComment!.Trim()}",
+            note = "Administrator approved the disputed fragment.",
             delayInDays = 0,
-            isFinalState = false
+            isFinalState = true
         });
 
         foreach (var competingFragment in competingFragments)
@@ -693,7 +780,7 @@ public class AdminController : ControllerBase
         {
             fkUserId = contract.fkProviderUserId,
             title = "Dispute approved",
-            message = $"Administrator approved your disputed fragment for contract #{contract.contractId}. The client can now only approve it.",
+            message = $"Administrator approved your disputed fragment for contract #{contract.contractId} and released the milestone payout.",
             type = "contract_fragment_dispute_approved",
             referenceId = contract.contractId,
             isRead = false,
@@ -703,18 +790,37 @@ public class AdminController : ControllerBase
         _db.b_notifications.Add(new b_notification
         {
             fkUserId = contract.fkClientUserId,
-            title = "Fragment returned for approval",
-            message = $"Administrator approved the disputed fragment for contract #{contract.contractId}. You can approve it, but you can no longer reject it.",
+            title = "Dispute resolved",
+            message = $"Administrator approved the disputed fragment for contract #{contract.contractId} and released the milestone payout from escrow.",
             type = "contract_fragment_dispute_approved",
             referenceId = contract.contractId,
             isRead = false,
             createdAt = DateTime.UtcNow
         });
 
+        if (contract.status == "Completed")
+        {
+            await _valuationService.EnsureRatingRowExistsAsync(contract.contractId, ct);
+            await _valuationService.RecalculateSystemRatingAsync(contract.contractId, ct);
+        }
+
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
-        return Ok(new { message = "Dispute approved successfully and returned to client." });
+        return Ok(new
+        {
+            message = "Dispute approved successfully and escrow funds were released.",
+            contractStatus = contract.status,
+            fragmentStatus = fragment.status,
+            milestoneStatus = milestone.status,
+            payout = new
+            {
+                fullAmountEth = expectedProviderAmountEth,
+                providerAmountEth = expectedProviderAmountEth,
+                clientRefundAmountEth = expectedClientRefundAmountEth,
+                txHash
+            }
+        });
     }
 
     [HttpPost("disputes/{fragmentId:int}/reject")]

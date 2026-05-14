@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 contract ServiceEscrow {
+    address public admin;
+
     struct Milestone {
         string title;
         uint256 amountWei;
@@ -41,6 +43,10 @@ contract ServiceEscrow {
         uint256 providerAmountWei,
         uint256 clientRefundAmountWei
     );
+
+    constructor() {
+        admin = msg.sender;
+    }
 
     function createProject(
         uint256 localContractId,
@@ -101,7 +107,7 @@ contract ServiceEscrow {
 
     function releaseMilestone(uint256 projectId, uint256 milestoneIndex) external {
         Project storage p = projects[projectId];
-        require(msg.sender == p.client, "Only client");
+        require(msg.sender == p.client || msg.sender == admin, "Only client or admin");
         require(p.funded, "Not funded");
 
         Milestone storage m = projectMilestones[projectId][milestoneIndex];
@@ -122,7 +128,7 @@ contract ServiceEscrow {
         uint256 clientRefundAmountWei
     ) external {
         Project storage p = projects[projectId];
-        require(msg.sender == p.client || msg.sender == p.provider, "Only parties");
+        require(msg.sender == p.client || msg.sender == p.provider || msg.sender == admin, "Only parties or admin");
         if (msg.sender == p.provider) {
             require(providerAmountWei == 0, "Provider can only refund");
         }

@@ -9,6 +9,7 @@ import { AppDialogProvider } from "./components/AppDialogProvider";
 import Home from "./pages/Home";
 import Work from "./pages/Work";
 import About from "./pages/About";
+import TermsOfService from "./pages/TermsOfService";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -119,6 +120,7 @@ export default function App() {
                         <Route path="/" element={<Home />} />
                         <Route path="/work" element={<Work />} />
                         <Route path="/about" element={<About />} />
+                        <Route path="/terms" element={<TermsOfService />} />
                         <Route path="/login" element={<Login onLogin={onLogin} />} />
                         <Route path="/register" element={<Register />} />
                         <Route path="/forgot-password" element={<ForgotPassword />} />

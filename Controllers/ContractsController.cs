@@ -587,8 +587,8 @@ public class ContractsController : ControllerBase
         _db.b_notifications.Add(new b_notification
         {
             fkUserId = contract.fkClientUserId,
-            title = "New fragment submitted",
-            message = $"Provider submitted a fragment for contract #{contract.contractId}, milestone #{milestone.milestoneNo}.",
+            title = "New milestone submitted",
+            message = $"Provider submitted a milestone for contract #{contract.contractId}, milestone #{milestone.milestoneNo}.",
             type = "contract_fragment_submitted",
             referenceId = contract.contractId,
             isRead = false,

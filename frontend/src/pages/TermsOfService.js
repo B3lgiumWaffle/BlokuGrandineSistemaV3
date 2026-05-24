@@ -1,7 +1,7 @@
 import { Box, Divider, Stack, Typography } from "@mui/material";
 import { PageHero, PageShell, SectionCard } from "../components/PageChrome";
 
-const sections = [
+export const termsOfServiceSections = [
     {
         title: "1. Platform Scope",
         body: [
@@ -87,7 +87,7 @@ export default function TermsOfService() {
                         </Typography>
                     </Box>
 
-                    {sections.map((section, index) => (
+                    {termsOfServiceSections.map((section, index) => (
                         <Box key={section.title}>
                             {index > 0 ? <Divider sx={{ mb: 2.5 }} /> : null}
                             <Typography variant="h6" sx={{ mb: 1 }}>

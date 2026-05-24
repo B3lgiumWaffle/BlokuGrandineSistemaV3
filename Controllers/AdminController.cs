@@ -780,7 +780,7 @@ public class AdminController : ControllerBase
         {
             fkUserId = contract.fkProviderUserId,
             title = "Dispute approved",
-            message = $"Administrator approved your disputed fragment for contract #{contract.contractId} and released the milestone payout.",
+            message = $"Administrator approved your disputed milestone for contract #{contract.contractId} and released the milestone payout.",
             type = "contract_fragment_dispute_approved",
             referenceId = contract.contractId,
             isRead = false,
@@ -791,7 +791,7 @@ public class AdminController : ControllerBase
         {
             fkUserId = contract.fkClientUserId,
             title = "Dispute resolved",
-            message = $"Administrator approved the disputed fragment for contract #{contract.contractId} and released the milestone payout from escrow.",
+            message = $"Administrator approved the disputed milestone for contract #{contract.contractId} and released the milestone payout from escrow.",
             type = "contract_fragment_dispute_approved",
             referenceId = contract.contractId,
             isRead = false,
@@ -886,7 +886,7 @@ public class AdminController : ControllerBase
         {
             fkUserId = contract.fkProviderUserId,
             title = "Dispute rejected",
-            message = $"Administrator kept your fragment rejected for contract #{contract.contractId}.",
+            message = $"Administrator kept your milestone rejected for contract #{contract.contractId}.",
             type = "contract_fragment_dispute_rejected",
             referenceId = contract.contractId,
             isRead = false,
@@ -897,7 +897,7 @@ public class AdminController : ControllerBase
         {
             fkUserId = contract.fkClientUserId,
             title = "Dispute resolved",
-            message = $"Administrator kept fragment rejected for contract #{contract.contractId}.",
+            message = $"Administrator kept milestone rejected for contract #{contract.contractId}.",
             type = "contract_fragment_dispute_rejected",
             referenceId = contract.contractId,
             isRead = false,

@@ -510,8 +510,8 @@ namespace BlokuGrandiniuSistema.Controllers;
         _db.b_notifications.Add(new b_notification
         {
             fkUserId = contract.fkProviderUserId,
-            title = "Fragment rejected",
-            message = $"Your fragment for contract #{contract.contractId} was rejected. Please revise and resubmit.",
+            title = "Milestone rejected",
+            message = $"Your milestone for contract #{contract.contractId} was rejected. Please revise and resubmit.",
             type = "contract_fragment_rejected",
             referenceId = contract.contractId,
             isRead = false,
@@ -596,7 +596,7 @@ namespace BlokuGrandiniuSistema.Controllers;
             _db.b_notifications.Add(new b_notification
             {
                 fkUserId = adminUserId,
-                title = "Fragment dispute requires review",
+                title = "Milestone dispute requires review",
                 message = $"Contract #{contract.contractId}, milestone #{milestone.milestoneNo} was escalated by provider.",
                 type = "contract_fragment_disputed",
                 referenceId = fragment.fragmentId,
@@ -608,7 +608,7 @@ namespace BlokuGrandiniuSistema.Controllers;
         _db.b_notifications.Add(new b_notification
         {
             fkUserId = contract.fkClientUserId,
-            title = "Fragment dispute opened",
+            title = "Milestone dispute opened",
             message = $"Provider asked administrator to review contract #{contract.contractId}, milestone #{milestone.milestoneNo}.",
             type = "contract_fragment_dispute_opened",
             referenceId = contract.contractId,
@@ -733,10 +733,10 @@ namespace BlokuGrandiniuSistema.Controllers;
         _db.b_notifications.Add(new b_notification
         {
             fkUserId = contract.fkProviderUserId,
-            title = settlement.WasPartial ? "Partial payout processed" : "Fragment approved",
+            title = settlement.WasPartial ? "Partial payout processed" : "Milestone approved",
             message = settlement.WasPartial
-                ? $"Fragment approved with partial payout for contract #{contract.contractId}."
-                : $"Fragment approved and payout released for contract #{contract.contractId}.",
+                ? $"Milestone approved with partial payout for contract #{contract.contractId}."
+                : $"Milestone approved and payout released for contract #{contract.contractId}.",
             type = settlement.WasPartial ? "contract_fragment_partial_release" : "contract_fragment_release",
             referenceId = contract.contractId,
             isRead = false,

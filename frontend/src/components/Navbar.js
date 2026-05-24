@@ -7,6 +7,13 @@ import { useMemo, useState, useEffect } from "react";
 
 const API_URL = process.env.REACT_APP_API_BASE ?? "http://localhost:8080";
 
+function milestoneNotificationText(value) {
+    return String(value ?? "")
+        .replace(/\bfrragment\b/gi, "milestone")
+        .replace(/\bfragments\b/gi, "milestones")
+        .replace(/\bfragment\b/gi, "milestone");
+}
+
 export default function Navbar({ user, onLogout }) {
     const location = useLocation();
     const navigate = useNavigate();
@@ -207,8 +214,8 @@ export default function Navbar({ user, onLogout }) {
                             ) : notifications.slice(0, 8).map((n) => (
                                 <MenuItem key={n.notificationId} onClick={() => markAsReadAndGo(n)} sx={{ alignItems: "flex-start", py: 1.2 }}>
                                     <ListItemText
-                                        primary={n.title}
-                                        secondary={n.message || ""}
+                                        primary={milestoneNotificationText(n.title)}
+                                        secondary={milestoneNotificationText(n.message)}
                                         primaryTypographyProps={{ fontWeight: n.isRead ? 600 : 800, fontSize: 14 }}
                                         secondaryTypographyProps={{ fontSize: 13 }}
                                     />

@@ -133,8 +133,8 @@ export default function AdminDisputes() {
         const confirmed = await dialog.confirm({
             title: isApprove ? "Approve dispute" : "Reject dispute",
             message: isApprove
-                ? "Are you sure you want to approve this disputed fragment and release escrow funds to the provider?"
-                : "Are you sure you want to keep this disputed fragment rejected?",
+                ? "Are you sure you want to approve this disputed milestone and release escrow funds to the provider?"
+                : "Are you sure you want to keep this disputed milestone rejected?",
             confirmText: isApprove ? "Approve" : "Reject"
         });
 
@@ -170,8 +170,8 @@ export default function AdminDisputes() {
                 variant: "success",
                 title: "Dispute resolved",
                 message: isApprove
-                    ? "Disputed fragment was approved and escrow funds were released."
-                    : "Disputed fragment was left rejected successfully."
+                    ? "Disputed milestone was approved and escrow funds were released."
+                    : "Disputed milestone was left rejected successfully."
             });
 
             await loadList(selectedId);
@@ -205,7 +205,7 @@ export default function AdminDisputes() {
             <Paper sx={{ p: 2, borderRadius: 3, mb: 2 }}>
                 <TextField
                     fullWidth
-                    label="Search by contract, fragment, listing, provider or client"
+                    label="Search by contract, milestone, listing, provider or client"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                 />
@@ -244,10 +244,10 @@ export default function AdminDisputes() {
                                     >
                                         <Stack spacing={0.7}>
                                             <Typography sx={{ fontWeight: 900 }}>
-                                                Contract #{item.contractId} • Fragment #{item.fragmentId}
+                                                Contract #{item.contractId} • Milestone #{item.fragmentId}
                                             </Typography>
                                             <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                                                {item.title || "Untitled fragment"}
+                                                {item.title || "Untitled milestone"}
                                             </Typography>
                                             <Typography variant="body2" sx={{ opacity: 0.78 }}>
                                                 Milestone #{item.milestoneNo} • {item.providerName} vs {item.clientName}
@@ -275,7 +275,7 @@ export default function AdminDisputes() {
                             <Typography>{detailErr}</Typography>
                         ) : !dispute ? (
                             <Typography sx={{ opacity: 0.75 }}>
-                                Select a dispute to review its contract and fragment details.
+                                Select a dispute to review its contract and milestone details.
                             </Typography>
                         ) : (
                             <Stack spacing={2}>
@@ -291,7 +291,7 @@ export default function AdminDisputes() {
 
                                     <Stack direction="row" spacing={1} flexWrap="wrap">
                                         <Chip label={`Contract: ${formatStatusLabel(dispute.contract.status)}`} variant="outlined" />
-                                        <Chip label={`Fragment: ${formatStatusLabel(dispute.fragment.status, "fragment")}`} color="info" variant="outlined" />
+                                        <Chip label={`Milestone: ${formatStatusLabel(dispute.fragment.status, "fragment")}`} color="info" variant="outlined" />
                                     </Stack>
                                 </Stack>
 
@@ -319,7 +319,7 @@ export default function AdminDisputes() {
 
                                 <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
                                     <Typography sx={{ fontWeight: 900, mb: 1 }}>
-                                        Disputed fragment
+                                        Disputed milestone
                                     </Typography>
                                     <Stack spacing={1}>
                                         <Typography variant="body2"><strong>Title:</strong> {dispute.fragment.title || "—"}</Typography>
@@ -336,26 +336,26 @@ export default function AdminDisputes() {
                                         </Typography>
                                         <Typography variant="body2">
                                             <strong>File:</strong>{" "}
-                                            {fileHref ? <a href={fileHref} target="_blank" rel="noreferrer">Download fragment</a> : "—"}
+                                            {fileHref ? <a href={fileHref} target="_blank" rel="noreferrer">Download milestone</a> : "—"}
                                         </Typography>
                                     </Stack>
                                 </Paper>
 
                                 <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
                                     <Typography sx={{ fontWeight: 900, mb: 1 }}>
-                                        Related requirement
+                                        Related milestone
                                     </Typography>
                                     <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                                        {dispute.requirement?.description || "No requirement description."}
+                                        {dispute.requirement?.description || "No milestone description."}
                                     </Typography>
                                     <Typography variant="body2" sx={{ mt: 1 }}>
                                         Deadline: {safeDate(dispute.requirement?.forseenCompletionDate)}
                                     </Typography>
                                     <Typography variant="body2">
-                                        Requirement file:{" "}
+                                        Milestone file:{" "}
                                         {dispute.requirement?.fileUrl ? (
                                             <a href={resolveFileHref(dispute.requirement.fileUrl)} target="_blank" rel="noreferrer">
-                                                Open requirement file
+                                                Open milestone file
                                             </a>
                                         ) : "—"}
                                     </Typography>
@@ -363,7 +363,7 @@ export default function AdminDisputes() {
 
                                 <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
                                     <Typography sx={{ fontWeight: 900, mb: 1 }}>
-                                        All fragments for this milestone
+                                        All milestone submissions
                                     </Typography>
                                     <Stack spacing={1}>
                                         {relatedFragments.map((fragment) => (
@@ -371,7 +371,7 @@ export default function AdminDisputes() {
                                                 <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
                                                     <Box>
                                                         <Typography sx={{ fontWeight: 800 }}>
-                                                            Fragment #{fragment.fragmentId} - {fragment.title || "Untitled"}
+                                                            Milestone #{fragment.fragmentId} - {fragment.title || "Untitled"}
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ opacity: 0.8 }}>
                                                             Submitted: {safeDate(fragment.submittedAt)}
@@ -412,7 +412,7 @@ export default function AdminDisputes() {
                                         disabled={busy}
                                         sx={{ fontWeight: 800 }}
                                     >
-                                        {busy ? "Saving..." : "Approve fragment"}
+                                        {busy ? "Saving..." : "Approve milestone"}
                                     </Button>
                                 </Stack>
                             </Stack>

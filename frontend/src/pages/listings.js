@@ -41,6 +41,9 @@ function normalizeListing(raw) {
         priceTo: x.priceTo ?? x.PriceTo ?? null,
         completionTime: x.completionTime ?? x.CompletionTime ?? "",
         categoryId: x.categoryId ?? x.CategoryId ?? null,
+        ownerUserRatingAverage: x.ownerUserRatingAverage ?? x.OwnerUserRatingAverage ?? null,
+        ownerSystemRatingAverage: x.ownerSystemRatingAverage ?? x.OwnerSystemRatingAverage ?? null,
+        ownerRatingsCount: x.ownerRatingsCount ?? x.OwnerRatingsCount ?? 0,
     };
 }
 
@@ -91,6 +94,13 @@ function formatDate(value) {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return "";
     return d.toLocaleString();
+}
+
+function formatRating(value) {
+    if (value == null || value === "") return "No rating";
+    const n = Number(value);
+    if (Number.isNaN(n)) return "No rating";
+    return `${n.toFixed(2)}/5`;
 }
 
 function newReq() {
@@ -222,14 +232,14 @@ function InquiryModal({
     const contractTermRows = [
         {
             key: "fragmentLate",
-            title: "Late fragment refund",
-            description: "Refund applied when an individual fragment is submitted after its own milestone deadline.",
+            title: "Late milestone refund",
+            description: "Refund applied when an individual milestone is submitted after its deadline.",
             refundField: "fragmentSpeedRefundPercent",
         },
         {
             key: "revisionCount",
-            title: "Fragment resubmission limit",
-            description: "How many times the same fragment can be submitted before the payout is penalized.",
+            title: "Milestone resubmission limit",
+            description: "How many times the same milestone can be submitted before the payout is penalized.",
             inputMode: "number",
             valueField: "revisionCountMaxAverage",
             valueLabel: "Max submissions",
@@ -239,7 +249,7 @@ function InquiryModal({
         {
             key: "contractLate",
             title: "Late final delivery refund",
-            description: "Refund applied if the last fragment is submitted after the final contract deadline.",
+            description: "Refund applied if the last milestone is submitted after the final contract deadline.",
             refundField: "contractSpeedRefundPercent",
         },
     ];
@@ -541,13 +551,13 @@ function InquiryModal({
                         >
                             <Box>
                                 <Typography variant="overline" sx={{ display: "block", color: "#0f766e", fontWeight: 800, letterSpacing: 1.1, mb: 0.35 }}>
-                                    Delivery requirements
+                                    Delivery milestones
                                 </Typography>
                                 <Typography variant="h6" sx={{ fontWeight: 800, color: "#0f172a" }}>
-                                    Requirements
+                                    Milestones
                                 </Typography>
                                 <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.7 }}>
-                                    Add the concrete requirements, target dates, and files you want the provider to review before accepting the inquiry.
+                                    Add the concrete milestones, target dates, and files you want the provider to review before accepting the inquiry.
                                 </Typography>
                             </Box>
 
@@ -557,7 +567,7 @@ function InquiryModal({
                                 variant="outlined"
                                 sx={{ alignSelf: { xs: "stretch", md: "center" }, fontWeight: 800 }}
                             >
-                            Add requirement
+                            Add milestone
                             </Button>
                         </Stack>
 
@@ -575,7 +585,7 @@ function InquiryModal({
                                     <Stack direction="row" justifyContent="space-between" gap={2} alignItems="center">
                                         <Box>
                                             <Typography sx={{ fontWeight: 800, color: "#0f172a" }}>
-                                                Requirement #{idx + 1}
+                                                Milestone #{idx + 1}
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: "text.secondary" }}>
                                                 Define scope, date, and supporting file if needed.
@@ -586,7 +596,7 @@ function InquiryModal({
                                             onClick={() => removeRequirement(idx)}
                                             disabled={requirements.length === 1}
                                             size="small"
-                                            aria-label="remove requirement"
+                                            aria-label="remove milestone"
                                             sx={{ border: "1px solid rgba(15,23,42,0.08)" }}
                                         >
                                             <DeleteIcon fontSize="small" />
@@ -596,7 +606,7 @@ function InquiryModal({
                                     <Grid container spacing={2} sx={{ mt: 0.25 }}>
                                         <Grid item xs={12} md={6}>
                                             <TextField
-                                                label="Requirement description"
+                                                label="Milestone description"
                                                 value={req.description}
                                                 onChange={(e) => setReqField(idx, "description", e.target.value)}
                                                 fullWidth
@@ -1030,6 +1040,41 @@ export default function Listing() {
                                         <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>
                                             Completion time: <b>{listing.completionTime || "-"}</b>
                                         </Typography>
+
+                                        <Box
+                                            sx={{
+                                                mt: 1.5,
+                                                p: 1.25,
+                                                border: "1px solid",
+                                                borderColor: "divider",
+                                                bgcolor: "#fafafa"
+                                            }}
+                                        >
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>
+                                                Provider rating
+                                            </Typography>
+                                            <Stack spacing={0.75}>
+                                                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                                                    <Typography variant="body2" sx={{ opacity: 0.78 }}>
+                                                        System rating
+                                                    </Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 900 }}>
+                                                        {formatRating(listing.ownerSystemRatingAverage)}
+                                                    </Typography>
+                                                </Stack>
+                                                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                                                    <Typography variant="body2" sx={{ opacity: 0.78 }}>
+                                                        User rating
+                                                    </Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 900 }}>
+                                                        {formatRating(listing.ownerUserRatingAverage)}
+                                                    </Typography>
+                                                </Stack>
+                                                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                                    Based on {listing.ownerRatingsCount ?? 0} completed contract{Number(listing.ownerRatingsCount ?? 0) === 1 ? "" : "s"}.
+                                                </Typography>
+                                            </Stack>
+                                        </Box>
 
                                         <Divider sx={{ my: 2 }} />
 

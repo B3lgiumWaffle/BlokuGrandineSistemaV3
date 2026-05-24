@@ -183,30 +183,49 @@ function normalizeRating(raw) {
     };
 }
 
-const SYSTEM_RATING_RULES = {
-    "Fragment speed": "On-time fragments get 2 points, late fragments get 0. The score is points sum divided by fragment count.",
-    "Revision count": "Max revisions are fragment resubmission number multiplied by milestone count. Up to 25% gets 2, up to 75% gets 1, more gets 0.",
-    "Contract speed": "Completed on or before deadline gets 2, up to 2 days late gets 1, more than 2 days late gets 0.",
-    "Message response": "Average response time up to 18 hours gets 2, up to 24 hours gets 1, over 24 hours gets 0.",
-    "Rejected fragments": "Less than the agreed allowed count gets 2, exactly the allowed count gets 1, more than allowed gets 0."
-};
+const SYSTEM_RATING_RULES = [
+    {
+        key: "Fragment speed",
+        label: "Milestone speed",
+        rule: "On-time milestones get 2 points, late milestones get 0. The score is points sum divided by milestone count."
+    },
+    {
+        key: "Revision count",
+        label: "Revision count",
+        rule: "Max revisions are milestone resubmission number multiplied by milestone count. Up to 25% gets 2, up to 75% gets 1, more gets 0."
+    },
+    {
+        key: "Contract speed",
+        label: "Contract speed",
+        rule: "Completed on or before deadline gets 2, up to 2 days late gets 1, more than 2 days late gets 0."
+    },
+    {
+        key: "Message response",
+        label: "Message response",
+        rule: "Average response time up to 18 hours gets 2, up to 24 hours gets 1, over 24 hours gets 0."
+    },
+    {
+        key: "Rejected fragments",
+        label: "Rejected milestones",
+        rule: "Less than the agreed allowed count gets 2, exactly the allowed count gets 1, more than allowed gets 0."
+    }
+];
 
 function parseSystemRatingReason(reason) {
-    const metricNames = Object.keys(SYSTEM_RATING_RULES);
     const lines = String(reason || "")
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean);
 
-    return metricNames.map((name) => {
-        const line = lines.find((x) => x.toLowerCase().startsWith(`${name.toLowerCase()}:`));
+    return SYSTEM_RATING_RULES.map((metric) => {
+        const line = lines.find((x) => x.toLowerCase().startsWith(`${metric.key.toLowerCase()}:`));
         const match = line?.match(/^[^:]+:\s*([^-\s]+)\s*-\s*(.*)$/);
 
         return {
-            name,
+            name: metric.label,
             score: match?.[1] || "—/2",
             formula: match?.[2] || line || "No calculation details available.",
-            rule: SYSTEM_RATING_RULES[name]
+            rule: metric.rule
         };
     });
 }
@@ -457,7 +476,7 @@ export default function ContractDetails() {
             const res = await apiGet(`/api/inquiries/contracts/${contractId}/fragments`);
             setFragmentsData(normalizeFragments(res));
         } catch (e) {
-            setFragmentsErr(e?.message ?? "Failed to load fragments");
+            setFragmentsErr(e?.message ?? "Failed to load milestones");
         } finally {
             setFragmentsLoading(false);
         }
@@ -672,7 +691,7 @@ export default function ContractDetails() {
         const formState = getSubmitForm(milestoneNo);
 
         if (!formState.title.trim()) {
-            await dialog.alert({ variant: "warning", title: "Fragment title required", message: "Fragment title is required." });
+            await dialog.alert({ variant: "warning", title: "Milestone title required", message: "Milestone title is required." });
             return;
         }
 
@@ -700,10 +719,10 @@ export default function ContractDetails() {
 
             if (!res.ok) {
                 const text = await res.text();
-                throw new Error(text || "Failed to submit fragment");
+                throw new Error(text || "Failed to submit milestone");
             }
 
-            await dialog.alert({ variant: "success", title: "Fragment submitted", message: "The fragment was submitted successfully." });
+            await dialog.alert({ variant: "success", title: "Milestone submitted", message: "The milestone was submitted successfully." });
             setSubmitForms((prev) => ({
                 ...prev,
                 [milestoneNo]: { title: "", description: "", file: null }
@@ -712,7 +731,7 @@ export default function ContractDetails() {
             await Promise.all([load(), loadFragments(), loadMessages(), loadRating()]);
         } catch (e) {
             console.error(e);
-            await dialog.alert({ variant: "error", title: "Fragment submit failed", message: e?.message ?? "Failed to submit fragment" });
+            await dialog.alert({ variant: "error", title: "Milestone submit failed", message: e?.message ?? "Failed to submit milestone" });
         } finally {
             setBusy(false);
         }
@@ -727,7 +746,7 @@ export default function ContractDetails() {
             }
 
             if (!item?.fundedAmountEth || item.status === "PendingFunding") {
-                throw new Error("Contract must be funded before approving a submitted fragment.");
+                throw new Error("Contract must be funded before approving a submitted milestone.");
             }
 
             const previewRaw = await apiGet(
@@ -753,11 +772,11 @@ export default function ContractDetails() {
                 }
             );
 
-            await dialog.alert({ variant: "success", title: "Fragment approved", message: "The fragment was approved and settled on-chain." });
+            await dialog.alert({ variant: "success", title: "Milestone approved", message: "The milestone was approved and settled on-chain." });
             await Promise.all([load(), loadFragments(), loadMessages(), loadRating()]);
         } catch (e) {
             console.error(e);
-            await dialog.alert({ variant: "error", title: "Fragment approval failed", message: e?.message ?? "Failed to approve fragment" });
+            await dialog.alert({ variant: "error", title: "Milestone approval failed", message: e?.message ?? "Failed to approve milestone" });
         } finally {
             setFragmentsBusy(false);
         }
@@ -774,11 +793,11 @@ export default function ContractDetails() {
                 }
             );
 
-            await dialog.alert({ variant: "success", title: "Fragment rejected", message: "The fragment was rejected successfully." });
+            await dialog.alert({ variant: "success", title: "Milestone rejected", message: "The milestone was rejected successfully." });
             await Promise.all([load(), loadFragments(), loadMessages(), loadRating()]);
         } catch (e) {
             console.error(e);
-            await dialog.alert({ variant: "error", title: "Fragment rejection failed", message: e?.message ?? "Failed to reject fragment" });
+            await dialog.alert({ variant: "error", title: "Milestone rejection failed", message: e?.message ?? "Failed to reject milestone" });
         } finally {
             setFragmentsBusy(false);
         }
@@ -787,7 +806,7 @@ export default function ContractDetails() {
     const onAskAdministrator = async (fragment) => {
         const confirmed = await dialog.confirm({
             title: "Ask for administrator",
-            message: "Are you sure you want to open a dispute for this rejected fragment? Administrator will review this milestone and make the final decision.",
+            message: "Are you sure you want to open a dispute for this rejected milestone? Administrator will review this milestone and make the final decision.",
             confirmText: "Ask administrator"
         });
 
@@ -820,8 +839,8 @@ export default function ContractDetails() {
 
     const onDeleteFragment = async (fragment) => {
         const confirmed = await dialog.confirm({
-            title: "Delete fragment",
-            message: "Delete this submitted fragment? It will be removed before client approval and will not be counted in fragment history.",
+            title: "Delete milestone",
+            message: "Delete this submitted milestone? It will be removed before client approval and will not be counted in milestone history.",
             confirmText: "Delete"
         });
 
@@ -834,16 +853,16 @@ export default function ContractDetails() {
 
             await dialog.alert({
                 variant: "success",
-                title: "Fragment deleted",
-                message: "The submitted fragment was deleted successfully."
+                title: "Milestone deleted",
+                message: "The submitted milestone was deleted successfully."
             });
             await Promise.all([load(), loadFragments(), loadMessages(), loadRating()]);
         } catch (e) {
             console.error(e);
             await dialog.alert({
                 variant: "error",
-                title: "Fragment delete failed",
-                message: e?.message ?? "Failed to delete fragment"
+                title: "Milestone delete failed",
+                message: e?.message ?? "Failed to delete milestone"
             });
         } finally {
             setFragmentsBusy(false);
@@ -1005,7 +1024,7 @@ export default function ContractDetails() {
                     >
                         <Box>
                             <Typography sx={{ fontWeight: 900 }}>
-                                {fragment.title || `Fragment #${fragment.fragmentId}`}
+                                {fragment.title || `Milestone #${fragment.fragmentId}`}
                             </Typography>
                             <Typography variant="body2" sx={{ opacity: 0.7 }}>
                                 Submitted at: {safeDate(fragment.submittedAt)}
@@ -1124,7 +1143,7 @@ export default function ContractDetails() {
                                     Administrator decision
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 700, color: "success.dark" }}>
-                                    Administrator approved this fragment. You can approve it, but you can no longer reject it.
+                                    Administrator approved this milestone. You can approve it, but you can no longer reject it.
                                 </Typography>
                             </Box>
                         )}
@@ -1353,7 +1372,7 @@ export default function ContractDetails() {
                                                 f.status === "Submitted"
                                         ) && (
                                             <Typography variant="body2" sx={{ mt: 0.75, color: "warning.main", fontWeight: 700 }}>
-                                                A fragment for this milestone is already submitted and waiting for approval.
+                                                A milestone is already submitted and waiting for approval.
                                             </Typography>
                                         )}
                                     </Box>
@@ -1362,12 +1381,12 @@ export default function ContractDetails() {
                                         <Box sx={{ width: "100%", mt: 1 }}>
                                             <Divider sx={{ mb: 1.5 }} />
                                             <Typography sx={{ fontWeight: 800, mb: 1 }}>
-                                                Submit fragment
+                                                Submit milestone
                                             </Typography>
 
                                             <Stack spacing={1.2}>
                                                 <TextField
-                                                    label="Fragment title"
+                                                    label="Milestone title"
                                                     fullWidth
                                                     value={getSubmitForm(m.milestoneNo).title}
                                                     onChange={(e) =>
@@ -1377,7 +1396,7 @@ export default function ContractDetails() {
                                                 />
 
                                                 <TextField
-                                                    label="Fragment description"
+                                                    label="Milestone description"
                                                     fullWidth
                                                     multiline
                                                     minRows={3}
@@ -1416,7 +1435,7 @@ export default function ContractDetails() {
                                                         disabled={busy}
                                                         sx={{ fontWeight: 800 }}
                                                     >
-                                                        {busy ? "Submitting..." : "Submit fragment"}
+                                                        {busy ? "Submitting..." : "Submit milestone"}
                                                     </Button>
                                                 </Stack>
                                             </Stack>
@@ -1430,7 +1449,7 @@ export default function ContractDetails() {
                     <Divider sx={{ my: 2 }} />
 
                     <Typography sx={{ fontWeight: 900, mb: 1.2 }}>
-                        Submitted Fragments
+                        Submitted Milestones
                     </Typography>
 
                     {fragmentsLoading ? (
@@ -1439,7 +1458,7 @@ export default function ContractDetails() {
                         </Box>
                     ) : fragmentsErr ? (
                         <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-                            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>Fragment error</Typography>
+                            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>Milestone error</Typography>
                             <Typography>{fragmentsErr}</Typography>
                         </Paper>
                     ) : (
@@ -1447,7 +1466,7 @@ export default function ContractDetails() {
                             {!fragmentGroups.some((group) => group.fragments.length) ? (
                                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
                                     <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                                        No fragments submitted yet.
+                                        No milestones submitted yet.
                                     </Typography>
                                 </Paper>
                             ) : (
@@ -1494,7 +1513,7 @@ export default function ContractDetails() {
 
                                                         <Stack direction="row" spacing={1} flexWrap="wrap">
                                                             <Chip
-                                                                label={`${group.fragments.length} fragment${group.fragments.length === 1 ? "" : "s"}`}
+                                                                label={`${group.fragments.length} milestone${group.fragments.length === 1 ? "" : "s"}`}
                                                                 variant="outlined"
                                                             />
                                                             {group.hasHistory && (
@@ -1518,7 +1537,7 @@ export default function ContractDetails() {
                                                         {expanded && historicalFragments.length > 0 && (
                                                             <Box sx={{ pt: 0.5 }}>
                                                                 <Typography sx={{ fontWeight: 800, mb: 1 }}>
-                                                                    Previous fragments
+                                                                    Previous milestones
                                                                 </Typography>
                                                                 <Stack spacing={1}>
                                                                     {historicalFragments.map((fragment) =>

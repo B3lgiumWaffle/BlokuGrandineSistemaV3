@@ -5,7 +5,7 @@ const sections = [
     {
         title: "1. Platform Scope",
         body: [
-            "Blockchain Service Platform is a project system for listing services, sending inquiries, agreeing on milestone-based contracts, submitting completed work fragments, reviewing delivery, and recording payment-related workflow events through smart contract support.",
+            "Blockchain Service Platform is a project system for listing services, sending inquiries, agreeing on milestone-based contracts, submitting completed milestones, reviewing delivery, and recording payment-related workflow events through smart contract support.",
             "The platform may be used only for lawful service collaboration and contract management. Users are responsible for the accuracy of listings, inquiries, uploaded materials, wallet addresses, and contract terms they submit."
         ]
     },
@@ -19,21 +19,21 @@ const sections = [
     {
         title: "3. Contracts, Milestones, and Funding",
         body: [
-            "A contract may be divided into milestones. Each milestone can have a separate work fragment, approval status, payment amount, and settlement record.",
+            "A contract may be divided into milestones. Each milestone can have its own submission, approval status, payment amount, and settlement record.",
             "When a client funds a contract through the escrow smart contract, the funded amount is intended to secure milestone payments according to the agreed contract flow and applicable platform decisions."
         ]
     },
     {
-        title: "4. Fragment Review",
+        title: "4. Milestone Review",
         body: [
-            "A service provider may submit a completed fragment for a milestone. The client may approve or reject the fragment according to the contract requirements and platform workflow.",
-            "Rejected fragments may be revised and resubmitted unless the milestone or contract has already reached a final settlement state."
+            "A service provider may submit a completed milestone. The client may approve or reject the milestone according to the agreed milestones and platform workflow.",
+            "Rejected milestones may be revised and resubmitted unless the milestone or contract has already reached a final settlement state."
         ]
     },
     {
         title: "5. Disputes and Administrator Settlement",
         body: [
-            "If a service provider escalates a rejected fragment as a dispute, an administrator may review the submitted fragment, the related requirement, the contract state, and the available review trail.",
+            "If a service provider escalates a rejected milestone as a dispute, an administrator may review the submitted milestone, the related milestone details, the contract state, and the available review trail.",
             "If the administrator approves the dispute in favor of the service provider, the administrator may authorize release of the disputed milestone funds directly from the escrow smart contract to the service provider. In that case, the client is not required to perform an additional approval action for that milestone, and the milestone may be marked as released or completed by the platform.",
             "If the administrator rejects the dispute, the existing rejection and revision flow remains in effect unless the contract is otherwise cancelled or completed."
         ]

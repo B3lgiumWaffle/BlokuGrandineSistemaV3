@@ -281,7 +281,7 @@ export default function MyInquiryDetails() {
             }
 
             fd.append("Description", draftDesc ?? "");
-            fd.append("ModifiedNote", "Updated requirements");
+            fd.append("ModifiedNote", "Updated milestones");
             fd.append("ContractTerms.FragmentSpeedMinScore", "2");
             fd.append("ContractTerms.FragmentSpeedRefundPercent", String(draftTerms.fragmentSpeedRefundPercent || 0));
             fd.append("ContractTerms.RevisionCountMaxAverage", String(draftTerms.revisionCountMaxAverage || 3));
@@ -418,8 +418,8 @@ export default function MyInquiryDetails() {
                                 <>
                                     <Typography sx={{ fontWeight: 900, mb: 1 }}>Refund rules</Typography>
                                     <Stack spacing={1.2} sx={{ mb: 2 }}>
-                                        <Chip size="small" variant="outlined" label={`Refund if a fragment is late: ${item.contractTerms.fragmentSpeedRefundPercent}%`} />
-                                        <Chip size="small" variant="outlined" label={`Same fragment submissions allowed: ${item.contractTerms.revisionCountMaxAverage}`} />
+                                        <Chip size="small" variant="outlined" label={`Refund if a milestone is late: ${item.contractTerms.fragmentSpeedRefundPercent}%`} />
+                                        <Chip size="small" variant="outlined" label={`Same milestone submissions allowed: ${item.contractTerms.revisionCountMaxAverage}`} />
                                         <Chip size="small" variant="outlined" label={`Refund if submission limit exceeded: ${item.contractTerms.revisionCountRefundPercent}%`} />
                                         <Chip size="small" variant="outlined" label={`Refund if final contract deadline is missed: ${item.contractTerms.contractSpeedRefundPercent}%`} />
                                     </Stack>
@@ -427,11 +427,11 @@ export default function MyInquiryDetails() {
                                 </>
                             )}
 
-                            <Typography sx={{ fontWeight: 900, mb: 1 }}>Requirements</Typography>
+                            <Typography sx={{ fontWeight: 900, mb: 1 }}>Milestones</Typography>
 
                             {item.requirements.length === 0 ? (
                                 <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                                    No requirements
+                                    No milestones
                                 </Typography>
                             ) : (
                                 <Stack spacing={1.2}>
@@ -439,7 +439,7 @@ export default function MyInquiryDetails() {
                                         <Paper key={r.requirementId} variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
                                             <Stack spacing={0.6}>
                                                 <Typography sx={{ fontWeight: 800 }}>
-                                                    Requirement #{index + 1}
+                                                    Milestone #{index + 1}
                                                 </Typography>
 
                                                 <Typography sx={{ whiteSpace: "pre-wrap" }}>
@@ -535,23 +535,23 @@ export default function MyInquiryDetails() {
                             <Stack spacing={1.5}>
                                 <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
                                     <Typography sx={{ fontWeight: 800, mb: 0.6 }}>
-                                        Late fragment refund
+                                        Late milestone refund
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.72, mb: 1.5 }}>
-                                        Set the refund percentage applied when any fragment is submitted after its own requirement deadline.
+                                        Set the refund percentage applied when any milestone is submitted after its own deadline.
                                     </Typography>
                                     <Grid container spacing={2}>
                                         <Grid item xs={12} md={6}>
                                             <TextField
                                                 label="Rule"
-                                                value="Applied when fragment milestone deadline is missed"
+                                                value="Applied when milestone deadline is missed"
                                                 fullWidth
                                                 InputProps={{ readOnly: true }}
                                             />
                                         </Grid>
                                         <Grid item xs={12} md={6}>
                                             <TextField
-                                                label="Refund if fragment is late"
+                                                label="Refund if milestone is late"
                                                 value={draftTerms.fragmentSpeedRefundPercent}
                                                 onChange={(e) => setDraftTerms((prev) => ({ ...prev, fragmentSpeedRefundPercent: e.target.value }))}
                                                 fullWidth
@@ -565,15 +565,15 @@ export default function MyInquiryDetails() {
 
                                 <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
                                     <Typography sx={{ fontWeight: 800, mb: 0.6 }}>
-                                        Fragment resubmission limit
+                                        Milestone resubmission limit
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.72, mb: 1.5 }}>
-                                        Decide how many times the same fragment can be submitted and what refund applies after that limit is exceeded.
+                                        Decide how many times the same milestone can be submitted and what refund applies after that limit is exceeded.
                                     </Typography>
                                     <Grid container spacing={2}>
                                         <Grid item xs={12} md={6}>
                                             <TextField
-                                                label="Max same fragment submissions"
+                                                label="Max same milestone submissions"
                                                 value={draftTerms.revisionCountMaxAverage}
                                                 onChange={(e) => setDraftTerms((prev) => ({ ...prev, revisionCountMaxAverage: e.target.value }))}
                                                 fullWidth
@@ -600,7 +600,7 @@ export default function MyInquiryDetails() {
                                         Late final delivery refund
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.72, mb: 1.5 }}>
-                                        Set the refund percentage applied if the last fragment misses the final contract deadline.
+                                        Set the refund percentage applied if the last milestone misses the final contract deadline.
                                     </Typography>
                                     <Grid container spacing={2}>
                                         <Grid item xs={12} md={6}>
@@ -629,9 +629,9 @@ export default function MyInquiryDetails() {
                             <Divider sx={{ my: 2 }} />
 
                             <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                <Typography sx={{ fontWeight: 900 }}>Requirements</Typography>
+                                <Typography sx={{ fontWeight: 900 }}>Milestones</Typography>
                                 <Button startIcon={<AddIcon />} onClick={addRequirement}>
-                                    Add requirement
+                                    Add milestone
                                 </Button>
                             </Stack>
 
@@ -641,7 +641,7 @@ export default function MyInquiryDetails() {
                                         <Stack spacing={1}>
                                             <Stack direction="row" alignItems="center" justifyContent="space-between">
                                                 <Typography sx={{ fontWeight: 800 }}>
-                                                    Requirement #{idx + 1}
+                                                    Milestone #{idx + 1}
                                                 </Typography>
 
                                                 <IconButton
@@ -656,7 +656,7 @@ export default function MyInquiryDetails() {
                                             <Grid container spacing={2}>
                                                 <Grid item xs={12} md={6}>
                                                     <TextField
-                                                        label="Requirement description"
+                                                        label="Milestone description"
                                                         value={r.description}
                                                         onChange={(e) => setReqField(idx, "description", e.target.value)}
                                                         fullWidth

@@ -107,7 +107,17 @@ public class BrowseListingsController : ControllerBase
                 completionTime = l.CompletionTime,
                 uploadTime = l.UploadTime,
                 ownerUserId = l.userId,
-                isActivated = l.isActivated
+                isActivated = l.isActivated,
+                ownerUserRatingAverage = _db.b_ratings
+                    .Where(r => r.fkToUserId == l.userId && r.userRating.HasValue)
+                    .Select(r => (decimal?)r.userRating!.Value)
+                    .Average(),
+                ownerSystemRatingAverage = _db.b_ratings
+                    .Where(r => r.fkToUserId == l.userId && r.systemRating.HasValue)
+                    .Select(r => r.systemRating)
+                    .Average(),
+                ownerRatingsCount = _db.b_ratings
+                    .Count(r => r.fkToUserId == l.userId && (r.userRating.HasValue || r.systemRating.HasValue))
             })
             .FirstOrDefaultAsync();
 

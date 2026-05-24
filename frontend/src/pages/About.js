@@ -8,7 +8,7 @@ const sections = [
     },
     {
         title: "Inquiries and negotiation",
-        text: "Clients can send structured inquiries, propose budgets, and attach requirement items. This creates a clearer path from first contact to an agreed scope."
+        text: "Clients can send structured inquiries, propose budgets, and attach milestone items. This creates a clearer path from first contact to an agreed scope."
     },
     {
         title: "Contracts and milestones",

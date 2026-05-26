@@ -47,6 +47,17 @@ function safeDate(v) {
     return d.toLocaleString();
 }
 
+function safeDateOnly(v) {
+    if (!v) return "N/A";
+    const text = String(v);
+    const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return "N/A";
+    return d.toLocaleDateString();
+}
+
 function normalizeContract(raw) {
     const x = raw?.item ?? raw?.data ?? raw ?? {};
 
@@ -146,6 +157,7 @@ function normalizeFragments(raw) {
                 contractId: f.contractId ?? f.ContractId,
                 milestoneId: f.milestoneId ?? f.MilestoneId,
                 requirementId: f.requirementId ?? f.RequirementId ?? null,
+                requirementDeadline: f.requirementDeadline ?? f.RequirementDeadline ?? null,
                 title: f.title ?? f.Title ?? "",
                 description: f.description ?? f.Description ?? "",
                 filePath: f.filePath ?? f.FilePath ?? null,
@@ -1093,6 +1105,21 @@ export default function ContractDetails() {
                                     Approved at
                                 </Typography>
                                 <Typography variant="body2">{safeDate(fragment.approvedAt)}</Typography>
+                            </Box>
+
+                            <Box
+                                sx={{
+                                    flex: 1,
+                                    p: 1.15,
+                                    border: "1px solid",
+                                    borderColor: "rgba(15, 23, 42, 0.08)",
+                                    bgcolor: "rgba(255,255,255,0.72)"
+                                }}
+                            >
+                                <Typography variant="caption" sx={{ display: "block", opacity: 0.65 }}>
+                                    Deadline
+                                </Typography>
+                                <Typography variant="body2">{safeDateOnly(fragment.requirementDeadline)}</Typography>
                             </Box>
                         </Stack>
 

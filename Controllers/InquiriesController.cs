@@ -938,17 +938,20 @@ namespace BlokuGrandiniuSistema.Controllers;
 
         if (!isClient && !isProvider) return Forbid();
 
-        var fragments = await _db.b_completed_listing_fragments
-            .AsNoTracking()
-            .Where(f => f.fkContractId == contractId)
-            .OrderBy(f => f.fkMilestoneId)
-            .ThenByDescending(f => f.submittedAt)
-            .Select(f => new
+        var fragments = await (
+            from f in _db.b_completed_listing_fragments.AsNoTracking()
+            join r in _db.b_requirements.AsNoTracking()
+                on f.fkRequirementId equals r.requirementId into requirementGroup
+            from requirement in requirementGroup.DefaultIfEmpty()
+            where f.fkContractId == contractId
+            orderby f.fkMilestoneId, f.submittedAt descending
+            select new
             {
                 fragmentId = f.fragmentId,
                 contractId = f.fkContractId,
                 milestoneId = f.fkMilestoneId,
                 requirementId = f.fkRequirementId,
+                requirementDeadline = requirement != null ? requirement.forseenCompletionDate : null,
                 title = f.title,
                 description = f.description,
                 filePath = f.filePath,
@@ -965,8 +968,7 @@ namespace BlokuGrandiniuSistema.Controllers;
                 releaseTxHash = f.releaseTxHash,
                 createdAt = f.createdAt,
                 updatedAt = f.updatedAt
-            })
-            .ToListAsync(ct);
+            }).ToListAsync(ct);
 
         return Ok(new
         {

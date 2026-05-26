@@ -86,6 +86,7 @@ function normalizeContract(raw) {
                     m.requirementDescription ??
                     m.RequirementDescription ??
                     "",
+                requirementDeadline: m.requirementDeadline ?? m.RequirementDeadline ?? null,
                 amountEurSnapshot: m.amountEurSnapshot ?? m.AmountEurSnapshot ?? null,
                 amountEth: m.amountEth ?? m.AmountEth ?? null,
                 status: m.status ?? m.Status ?? "",
@@ -1383,6 +1384,9 @@ export default function ContractDetails() {
                                         </Typography>
                                         <Typography variant="body2" sx={{ opacity: 0.85 }}>
                                             On-chain amount: {eth(m.amountEth)}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ opacity: 0.85 }}>
+                                            Deadline: {safeDateOnly(m.requirementDeadline)}
                                         </Typography>
                                         <Typography variant="body2" sx={{ opacity: 0.85 }}>
                                             Status: {formatStatusLabel(m.status, "milestone")}

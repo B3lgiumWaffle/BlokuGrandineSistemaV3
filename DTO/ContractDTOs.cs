@@ -20,6 +20,7 @@ public class ContractMilestoneDTO
     public int MilestoneNo { get; set; }
     public int? RequirementId { get; set; }
     public string RequirementDescription { get; set; } = "";
+    public DateOnly? RequirementDeadline { get; set; }
     public decimal AmountEurSnapshot { get; set; }
     public decimal? AmountEth { get; set; }
     public string Status { get; set; } = "";

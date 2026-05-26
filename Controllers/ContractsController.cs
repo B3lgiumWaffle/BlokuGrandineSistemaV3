@@ -663,6 +663,7 @@ public class ContractsController : ControllerBase
                 MilestoneNo = m.milestoneNo,
                 RequirementId = m.fkRequirementId,
                 RequirementDescription = m.fkRequirement?.description ?? "",
+                RequirementDeadline = m.fkRequirement?.forseenCompletionDate,
                 AmountEurSnapshot = m.amountEurSnapshot,
                 AmountEth = m.amountEth,
                 Status = m.status,

@@ -27,7 +27,17 @@ function normalize(raw) {
         isConfirmed: x.isConfirmed ?? x.IsConfirmed ?? false,
         lastModifiedBy: x.lastModifiedBy ?? x.LastModifiedBy ?? null,
         senderSeen: x.senderSeen ?? x.SenderSeen ?? true,
-    }));
+    })).sort(compareNewest);
+}
+
+function dateValue(v) {
+    if (!v) return 0;
+    const time = new Date(v).getTime();
+    return Number.isNaN(time) ? 0 : time;
+}
+
+function compareNewest(a, b) {
+    return dateValue(b.creationDate) - dateValue(a.creationDate);
 }
 
 function money(v) {

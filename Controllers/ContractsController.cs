@@ -746,6 +746,7 @@ public class ContractsController : ControllerBase
                 MilestoneAmountEth = c.milestoneAmountEth,
                 FundingTxHash = c.fundingTxHash,
                 Status = c.status,
+                CreatedAt = c.createdAt,
                 ListingTitle = l.Title ?? "Untitled listing",
                 OtherPartyName = c.fkClientUserId == userId.Value
                     ? (!string.IsNullOrWhiteSpace(provider.Username)

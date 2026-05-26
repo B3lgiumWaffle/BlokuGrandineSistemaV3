@@ -39,7 +39,17 @@ function normalizeContracts(raw) {
         listingTitle: x.listingTitle ?? x.ListingTitle ?? "Untitled listing",
         otherPartyName: x.otherPartyName ?? x.OtherPartyName ?? "",
         myRole: x.myRole ?? x.MyRole ?? "",
-    }));
+    })).sort(compareNewest);
+}
+
+function dateValue(v) {
+    if (!v) return 0;
+    const time = new Date(v).getTime();
+    return Number.isNaN(time) ? 0 : time;
+}
+
+function compareNewest(a, b) {
+    return dateValue(b.createdAt) - dateValue(a.createdAt);
 }
 
 function money(v) {
@@ -185,6 +195,11 @@ export default function MyContracts() {
             } else {
                 base[role.key].ongoing.push(item);
             }
+        }
+
+        for (const group of Object.values(base)) {
+            group.ongoing.sort(compareNewest);
+            group.completed.sort(compareNewest);
         }
 
         return [base.provider, base.client];

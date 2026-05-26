@@ -43,9 +43,9 @@ function normalizeGroups(raw) {
                     creationDate: x.creationDate ?? x.CreationDate ?? x.createdAt ?? null,
                     isConfirmed: x.isConfirmed ?? x.IsConfirmed ?? false,
                     fkUserId: x.fkUserId ?? x.FkUserId ?? null,
-                })),
+                })).sort(compareNewest),
             };
-        });
+        }).sort(compareGroupsByNewestInquiry);
     }
 
     // Otherwise group client-side
@@ -70,9 +70,27 @@ function normalizeGroups(raw) {
         byListing.get(listingId).inquiries.push(inquiry);
     }
 
-    return Array.from(byListing.values()).sort((a, b) =>
-        (a.listingTitle || "").localeCompare(b.listingTitle || "")
-    );
+    return Array.from(byListing.values())
+        .map((g) => ({ ...g, inquiries: g.inquiries.sort(compareNewest) }))
+        .sort(compareGroupsByNewestInquiry);
+}
+
+function dateValue(v) {
+    if (!v) return 0;
+    const time = new Date(v).getTime();
+    return Number.isNaN(time) ? 0 : time;
+}
+
+function compareNewest(a, b) {
+    return dateValue(b.creationDate) - dateValue(a.creationDate);
+}
+
+function newestInquiryDate(group) {
+    return Math.max(0, ...(group.inquiries ?? []).map((x) => dateValue(x.creationDate)));
+}
+
+function compareGroupsByNewestInquiry(a, b) {
+    return newestInquiryDate(b) - newestInquiryDate(a);
 }
 
 function priceText(x) {

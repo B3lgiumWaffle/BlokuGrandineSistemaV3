@@ -310,7 +310,6 @@ public class AdminController : ControllerBase
 
         try
         {
-            // direct user-linked data
             var notifications = await _db.b_notifications
                 .Where(x => x.fkUserId == userId)
                 .ToListAsync(ct);

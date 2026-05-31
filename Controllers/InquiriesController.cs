@@ -24,10 +24,7 @@ namespace BlokuGrandiniuSistema.Controllers;
         _valuationService = valuationService;
     }
 
-    // ---------------------------
-    // CREATE (Sender creates inquiry)
-    // POST api/inquiries
-    // ---------------------------
+
     [Authorize]
         [HttpPost]
         [Consumes("multipart/form-data")]
@@ -58,13 +55,9 @@ namespace BlokuGrandiniuSistema.Controllers;
                 creationDate = DateTime.UtcNow,
                 isConfirmed = false,
 
-                // NEW flags (must exist in entity)
                 lastModifiedBy = "SENDER",
                 ownerSeen = false,
                 senderSeen = true,
-
-                // optional
-                // Status = "PENDING"
             };
 
             _db.b_inquiries.Add(inquiry);
@@ -99,10 +92,7 @@ namespace BlokuGrandiniuSistema.Controllers;
             return CreatedAtAction(nameof(GetById), new { id = inquiry.inquiryId }, details);
         }
 
-        // ---------------------------
-        // GET details (both roles use)
-        // GET api/inquiries/{id}
-        // ---------------------------
+
         [Authorize]
         [HttpGet("{id:int}")]
         public async Task<ActionResult<InquiryDetailsDTO>> GetById(int id, CancellationToken ct)
@@ -131,10 +121,7 @@ namespace BlokuGrandiniuSistema.Controllers;
             return Ok(dto);
         }
 
-        // ---------------------------
-        // OWNER inbox grouped by listing
-        // GET api/inquiries/for-my-listings
-        // ---------------------------
+
         [Authorize]
         [HttpGet("for-my-listings")]
         public async Task<ActionResult<List<object>>> ForMyListings(CancellationToken ct)
@@ -173,10 +160,7 @@ namespace BlokuGrandiniuSistema.Controllers;
             return Ok(result);
         }
 
-        // ---------------------------
-        // SENDER list (my sent)
-        // GET api/inquiries/my-sent
-        // ---------------------------
+
         [Authorize]
         [HttpGet("my-sent")]
         public async Task<ActionResult<List<InquiryListItemDTO>>> MySent(CancellationToken ct)
@@ -207,11 +191,7 @@ namespace BlokuGrandiniuSistema.Controllers;
             return Ok(list);
         }
 
-        // ---------------------------
-        // Seen flags
-        // Owner opens -> set OwnerSeen = 1
-        // POST api/inquiries/{id}/seen-owner
-        // ---------------------------
+
         [Authorize]
         [HttpPost("{id:int}/seen-owner")]
         public async Task<IActionResult> SeenOwner(int id, CancellationToken ct)
@@ -235,8 +215,7 @@ namespace BlokuGrandiniuSistema.Controllers;
             return NoContent();
         }
 
-        // Sender opens -> set SenderSeen = 1
-        // POST api/inquiries/{id}/seen-sender
+
         [Authorize]
         [HttpPost("{id:int}/seen-sender")]
         public async Task<IActionResult> SeenSender(int id, CancellationToken ct)
@@ -253,10 +232,7 @@ namespace BlokuGrandiniuSistema.Controllers;
             return NoContent();
         }
 
-        // ---------------------------
-        // MODIFY by OWNER
-        // PUT api/inquiries/{id}
-        // ---------------------------
+
         [Authorize]
         [HttpPut("{id:int}")]
         [Consumes("multipart/form-data")]
@@ -265,24 +241,18 @@ namespace BlokuGrandiniuSistema.Controllers;
         var userId = GetUserIdFromJwt();
         if (userId == null) return Unauthorized();
 
-        // ✅ Inquiry description (string) tikrinimas
         if (string.IsNullOrWhiteSpace(dto.Description))
             return BadRequest("Description is required.");
 
-        // ✅ Requirements (List<RequirementUpdateDTO>) tikrinimas
         if (dto.Requirements == null || dto.Requirements.Count == 0)
             return BadRequest("At least one requirement is required.");
 
-        // ✅ Tikrinam, kad nebūtų tuščių requirement aprašymų
         if (dto.Requirements.Any(r => string.IsNullOrWhiteSpace(r.Description)))
             return BadRequest("Requirements cannot contain empty descriptions.");
 
         var contractTermsValidationError = ValidateContractTerms(dto.ContractTerms);
         if (contractTermsValidationError != null) return BadRequest(contractTermsValidationError);
 
-        // (optional) jei nori uždrausti praeities datą
-        // if (dto.Requirements.Any(r => r.ForseenCompletionDate.HasValue && r.ForseenCompletionDate.Value.Date < DateTime.UtcNow.Date))
-        //     return BadRequest("ForseenCompletionDate cannot be in the past.");
 
         var inquiry = await _db.b_inquiries.FirstOrDefaultAsync(i => i.inquiryId == id, ct);
         if (inquiry == null) return NotFound();
@@ -300,10 +270,6 @@ namespace BlokuGrandiniuSistema.Controllers;
             return NoContent();
         }
 
-        // ---------------------------
-        // MODIFY by SENDER
-        // PUT api/inquiries/{id}/sender
-        // ---------------------------
         [Authorize]
         [HttpPut("{id:int}/sender")]
         [Consumes("multipart/form-data")]
@@ -329,10 +295,7 @@ namespace BlokuGrandiniuSistema.Controllers;
                 return NoContent();
         }
 
-    // ---------------------------
-    // ACCEPT by OWNER (accept inquiry)
-    // POST api/inquiries/{id}/accept-owner
-    // ---------------------------
+
     [Authorize]
     [HttpPost("{id:int}/accept-owner")]
     public async Task<IActionResult> AcceptOwner(int id, CancellationToken ct)
@@ -351,7 +314,6 @@ namespace BlokuGrandiniuSistema.Controllers;
         if (ownerId == null) return NotFound("Listing not found.");
         if (ownerId != userId.Value) return Forbid();
 
-        // ✅ NEGALIMA accept, jei paskutinis modifikavo OWNER
         if (string.Equals(inquiry.lastModifiedBy, "OWNER", StringComparison.OrdinalIgnoreCase))
             return BadRequest("You cannot accept right after modifying. Wait for sender to accept your changes.");
 
@@ -365,10 +327,6 @@ namespace BlokuGrandiniuSistema.Controllers;
         return NoContent();
     }
 
-    // ---------------------------
-    // ACCEPT by SENDER (acknowledge / accept latest changes)
-    // POST api/inquiries/{id}/accept-sender
-    // ---------------------------
     [Authorize]
     [HttpPost("{id:int}/accept-sender")]
     public async Task<IActionResult> AcceptSender(int id, CancellationToken ct)
@@ -380,11 +338,9 @@ namespace BlokuGrandiniuSistema.Controllers;
         if (inquiry == null) return NotFound();
         if (inquiry.fk_userId != userId.Value) return Forbid();
 
-        // ✅ NEGALIMA accept, jei paskutinis modifikavo SENDER (t.y. tu pats)
         if (!string.Equals(inquiry.lastModifiedBy, "OWNER", StringComparison.OrdinalIgnoreCase))
             return BadRequest("Nothing to accept. Owner has not modified since your last change.");
 
-        // "I accept owner's modifications"
         inquiry.lastModifiedBy = "SENDER";
         inquiry.ownerSeen = false;
         inquiry.senderSeen = true;
@@ -393,11 +349,6 @@ namespace BlokuGrandiniuSistema.Controllers;
         return NoContent();
     }
 
-    // ---------------------------
-    // DELETE (Decline = delete)
-    // DELETE api/inquiries/{id}
-    // allow sender OR listing owner
-    // ---------------------------
     [Authorize]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
@@ -424,10 +375,6 @@ namespace BlokuGrandiniuSistema.Controllers;
             return NoContent();
         }
 
-    // ---------------------------
-    // REJECT submitted fragment by client
-    // POST api/inquiries/contracts/{contractId}/fragments/{fragmentId}/reject
-    // ---------------------------
     [Authorize]
     [HttpPost("contracts/{contractId:int}/fragments/{fragmentId:int}/reject")]
     public async Task<IActionResult> RejectFragment(
@@ -626,10 +573,6 @@ namespace BlokuGrandiniuSistema.Controllers;
         });
     }
 
-    // ---------------------------
-    // APPROVE submitted fragment by client + settle payout rules
-    // POST api/inquiries/contracts/{contractId}/fragments/{fragmentId}/approve
-    // ---------------------------
     [Authorize]
     [HttpPost("contracts/{contractId:int}/fragments/{fragmentId:int}/approve")]
         public async Task<IActionResult> ApproveFragment(
@@ -856,10 +799,6 @@ namespace BlokuGrandiniuSistema.Controllers;
         });
     }
 
-    // ---------------------------
-    // GET settlement preview before on-chain payout
-    // GET api/inquiries/contracts/{contractId}/fragments/{fragmentId}/settlement-preview
-    // ---------------------------
     [Authorize]
     [HttpGet("contracts/{contractId:int}/fragments/{fragmentId:int}/settlement-preview")]
     public async Task<IActionResult> GetSettlementPreview(int contractId, int fragmentId, CancellationToken ct)
@@ -916,10 +855,6 @@ namespace BlokuGrandiniuSistema.Controllers;
         });
     }
 
-    // ---------------------------
-    // GET contract fragments
-    // GET api/inquiries/contracts/{contractId}/fragments
-    // ---------------------------
     [Authorize]
     [HttpGet("contracts/{contractId:int}/fragments")]
     public async Task<IActionResult> GetContractFragments(int contractId, CancellationToken ct)
@@ -980,9 +915,6 @@ namespace BlokuGrandiniuSistema.Controllers;
         });
     }
 
-    // ---------------------------
-    // helpers
-    // ---------------------------
     private int? GetUserIdFromJwt()
         {
             var s =
@@ -1045,10 +977,7 @@ namespace BlokuGrandiniuSistema.Controllers;
                 inquiry.senderSeen = true;
             }
 
-            // optional fields if exist in entity:
-            // inquiry.IsModified = true;
              inquiry.modifiedAt = DateTime.UtcNow;
-            // inquiry.ModifiedNote = string.IsNullOrWhiteSpace(dto.ModifiedNote) ? null : dto.ModifiedNote.Trim();
 
             var existingTerms = await _db.b_inquiry_contract_terms
                 .FirstOrDefaultAsync(t => t.fkInquiryId == inquiry.inquiryId, ct);
@@ -1113,7 +1042,6 @@ namespace BlokuGrandiniuSistema.Controllers;
                 }
             }
 
-            // remove requirements that are not sent anymore (only if client uses ids)
             if (dto.Requirements.Any(x => x.RequirementId.HasValue))
             {
                 foreach (var old in existingReqs)
@@ -1186,8 +1114,6 @@ namespace BlokuGrandiniuSistema.Controllers;
                 OwnerSeen = inquiry.ownerSeen,
                 SenderSeen = inquiry.senderSeen,
 
-                // Status = inquiry.Status,
-                // ModifiedNote = inquiry.ModifiedNote,
                  ModifiedAt = inquiry.modifiedAt,
 
                 Requirements = reqs,

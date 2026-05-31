@@ -120,7 +120,6 @@ export default function MyInquiryDetails() {
 
     const statusMeta = getInquiryStatusMeta(item?.status, item?.isConfirmed);
 
-    // Owner gali accept tik jei paskutinis modifikavo ne OWNER ir dar nėra confirmed
     const canAccept = item?.lastModifiedBy !== "OWNER" && !item?.isConfirmed;
     const canModifyOrDecline = !item?.isConfirmed;
 

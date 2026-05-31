@@ -36,8 +36,6 @@ export default function AddListing() {
     const [completionTime, setCompletionTime] = useState("");
     const [description, setDescription] = useState("");
 
-    // photos (local before upload)
-    // { id, file, previewUrl, isPrimary }
     const [photos, setPhotos] = useState([]);
     const [saving, setSaving] = useState(false);
 
@@ -65,7 +63,7 @@ export default function AddListing() {
             const next = [...prev];
 
             for (const f of files) {
-                // basic type check
+                
                 if (!f.type?.startsWith("image/")) continue;
 
                 const id = crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random()}`;
@@ -98,7 +96,7 @@ export default function AddListing() {
 
             const next = prev.filter((p) => p.id !== id);
 
-            // jei ištrynė primary — padarom pirmą likusį primary
+            
             if (next.length > 0 && !next.some((p) => p.isPrimary)) {
                 next[0] = { ...next[0], isPrimary: true };
             }
@@ -106,7 +104,7 @@ export default function AddListing() {
         });
     };
 
-    // upload photos after listing created
+    
     const uploadPhotos = async (listingId) => {
         if (!photos.length) return;
 

@@ -89,7 +89,6 @@ export default function MyListings() {
                 return;
             }
 
-            // Pašalinam iš state be puslapio reload
             setItems((prev) => prev.filter((x) => x.listingId !== listingId));
 
         } catch (err) {

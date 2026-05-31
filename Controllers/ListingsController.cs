@@ -37,11 +37,9 @@ public class ListingsController : ControllerBase
         if (!int.TryParse(claim.Value, out int userId))
             return Unauthorized();
 
-        // (optional) minimal validation
         if (string.IsNullOrWhiteSpace(req.Title))
             return BadRequest(new { message = "Title yra privalomas." });
 
-        // (optional) patikrinti ar tokia kategorija egzistuoja
         var categoryExists = await _db.b_categories.AnyAsync(c => c.CategoryId == req.CategoryId);
         if (!categoryExists)
             return BadRequest(new { message = "Neteisinga kategorija." });
@@ -125,7 +123,6 @@ public class ListingsController : ControllerBase
             })
             .ToListAsync();
 
-        // pridėti pilną URL
         var result = listings.Select(l => new
         {
             l.listingId,
@@ -236,11 +233,10 @@ public class ListingsController : ControllerBase
 
         if (listing == null) return NotFound();
 
-        // optional: validacija
         if (string.IsNullOrWhiteSpace(req.Title))
             return BadRequest(new { message = "Title yra privalomas." });
 
-        // optional: patikrinti ar category egzistuoja
+
         var categoryExists = await _db.b_categories.AnyAsync(c => c.CategoryId == req.CategoryId);
         if (!categoryExists)
             return BadRequest(new { message = "Neteisinga kategorija." });
@@ -257,7 +253,6 @@ public class ListingsController : ControllerBase
         return Ok(new { message = "Updated", listingId = listing.listingId });
     }
 
-    // DELETE /api/listings/{id} (optional - jei nori dabar)
     [HttpDelete("{id:int}")]
     [Authorize]
     public async Task<IActionResult> Delete(int id)
@@ -275,12 +270,6 @@ public class ListingsController : ControllerBase
         return Ok(new { message = "Deleted" });
     }
 
-
-    // -------------------------
-    // PHOTOS
-    // -------------------------
-
-    // GET /api/listings/{listingId}/photos
     [HttpGet("{listingId:int}/photos")]
     [Authorize]
     public async Task<IActionResult> GetPhotos(int listingId)
@@ -314,8 +303,6 @@ public class ListingsController : ControllerBase
     }
 
 
-    // POST /api/listings/{listingId}/photos
-    // FormData: Files (multi) + PrimaryIndex
     [HttpPost("{listingId:int}/photos")]
     [Authorize]
     [Consumes("multipart/form-data")]
@@ -337,12 +324,10 @@ public class ListingsController : ControllerBase
 
         var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp" };
 
-        // Folder: wwwroot/uploads/listings/{listingId}/
         var wwwroot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
         var folder = Path.Combine(wwwroot, "uploads", "listings", listingId.ToString());
         Directory.CreateDirectory(folder);
 
-        // Jei įkeliam naują setą ir nurodom primary — atžymim esamą primary (tik jei bus bent viena nauja)
         var existingPrimary = await _db.b_listing_photos
             .Where(p => p.listingId == listingId && p.IsPrimary)
             .ToListAsync();
@@ -400,7 +385,6 @@ public class ListingsController : ControllerBase
     }
 
 
-    // PUT /api/listings/{listingId}/photos/{photoId}/primary
     [HttpPut("{listingId:int}/photos/{photoId:int}/primary")]
     [Authorize]
     public async Task<IActionResult> SetPrimaryPhoto(int listingId, int photoId)
@@ -431,7 +415,6 @@ public class ListingsController : ControllerBase
     }
 
 
-    // DELETE /api/listings/{listingId}/photos/{photoId}
     [HttpDelete("{listingId:int}/photos/{photoId:int}")]
     [Authorize]
     public async Task<IActionResult> DeletePhoto(int listingId, int photoId)
@@ -451,7 +434,6 @@ public class ListingsController : ControllerBase
 
         var wasPrimary = photo.IsPrimary;
 
-        // try delete file from disk (optional)
         try
         {
             var physical = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", photo.PhotoUrl.TrimStart('/').Replace("/", Path.DirectorySeparatorChar.ToString()));
@@ -463,7 +445,6 @@ public class ListingsController : ControllerBase
         _db.b_listing_photos.Remove(photo);
         await _db.SaveChangesAsync();
 
-        // if deleted primary -> set another as primary
         if (wasPrimary)
         {
             var next = await _db.b_listing_photos

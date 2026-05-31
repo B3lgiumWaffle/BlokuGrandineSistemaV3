@@ -15,6 +15,7 @@ builder.Services.AddControllers();
 builder.Services.AddScoped<IFileStorage, FileStorage>();
 builder.Services.AddScoped<IValuationService, ValuationService>();
 builder.Services.AddHttpClient<IPasswordResetEmailSender, ResendPasswordResetEmailSender>();
+builder.Services.AddHostedService<MilestoneDeadlineNotificationService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

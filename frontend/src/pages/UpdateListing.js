@@ -37,9 +37,7 @@ export default function UpdateListing() {
     const [completionTime, setCompletionTime] = useState("");
     const [description, setDescription] = useState("");
 
-    // existing photos from backend: { photoId, photoUrl, isPrimary, uploadTime }
     const [photos, setPhotos] = useState([]);
-    // new photos local: { id, file, previewUrl, isPrimary }
     const [newPhotos, setNewPhotos] = useState([]);
 
     const [loading, setLoading] = useState(true);
@@ -47,7 +45,6 @@ export default function UpdateListing() {
 
     const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
-    // fetch categories + listing + photos
     useEffect(() => {
         if (!token) {
             navigate("/login");
@@ -114,7 +111,6 @@ export default function UpdateListing() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, navigate, token]);
 
-    // ---------- PHOTO: NEW (LOCAL) ----------
     const onPickNewPhotos = (e) => {
         const files = Array.from(e.target.files || []);
         if (!files.length) return;

@@ -236,7 +236,6 @@ export default function SentInquiryDetails() {
     const addReq = () => setDraftReqs(prev => [...prev, newReq()]);
     const removeReq = (idx) => setDraftReqs(prev => prev.filter((_, i) => i !== idx));
 
-    // Sender gali accept tik jei paskutinis modifikavo OWNER ir dar nėra confirmed
     const canAccept = item?.lastModifiedBy === "OWNER" && !item?.isConfirmed;
     const canModifyOrDecline = !item?.isConfirmed;
 

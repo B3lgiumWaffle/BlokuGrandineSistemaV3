@@ -93,6 +93,7 @@ export default function Navbar({ user, onLogout }) {
             if (n.type === "ListingRejected") return navigate(`/my-listings/edit/${n.referenceId}`);
             if (n.type === "ListingApproved") return navigate("/my-listings");
             if (n.type === "contract_message") return navigate(`/contracts/${n.referenceId}`);
+            if (n.type === "milestone_deadline_reached") return navigate(`/contracts/${n.referenceId}`);
             if (n.type === "contract_fragment_disputed") return navigate("/admin/disputes");
             if (n.type?.startsWith("contract_fragment_dispute_")) return navigate(`/contracts/${n.referenceId}`);
             navigate("/my-profile");

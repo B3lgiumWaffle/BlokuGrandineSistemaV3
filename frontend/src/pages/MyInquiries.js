@@ -16,15 +16,9 @@ import { BackButton, EmptyState, PageHero, PageShell, SectionCard } from "../com
 import { createDisplayNumberMap, getDisplayNumber } from "../utils/displayNames";
 import { formatEthFixed } from "../utils/currency";
 
-/**
- * Expected API shapes supported:
- * A) [{ listingId, listingTitle, inquiries: [...] }, ...]
- * B) flat list: [{ inquiryId, fkListingId, listingTitle, ... }, ...]
- */
 function normalizeGroups(raw) {
     const data = Array.isArray(raw) ? raw : raw?.items ?? raw?.data ?? [];
 
-    // If it already looks grouped
     const looksGrouped =
         Array.isArray(data) &&
         data.length > 0 &&
@@ -48,7 +42,6 @@ function normalizeGroups(raw) {
         }).sort(compareGroupsByNewestInquiry);
     }
 
-    // Otherwise group client-side
     const byListing = new Map();
 
     for (const x of data) {
@@ -133,7 +126,6 @@ export default function MyInquiries() {
                 setLoading(true);
                 setErr("");
 
-                // ✅ endpoint for "inquiries for listings I own"
                 const data = await apiGet("/api/inquiries/for-my-listings");
                 if (!alive) return;
 
@@ -168,7 +160,7 @@ export default function MyInquiries() {
                     );
                 });
 
-                if (hitListing) return g; // show all inquiries if listing title matches
+                if (hitListing) return g; 
                 if (inquiries.length === 0) return null;
                 return { ...g, inquiries };
             })

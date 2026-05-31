@@ -20,12 +20,6 @@ public class BrowseListingsController : ControllerBase
         return claim != null && int.TryParse(claim.Value, out userId);
     }
 
-    // ---------------------------------------
-    // BROWSE (visi prisijungę mato visus)
-    // ---------------------------------------
-
-    // GET /api/browselistings
-    // grąžina visus listingus su primary + iki 3 thumbs (kaip Fiverr preview)
     [HttpGet]
     [Authorize]
     public async Task<IActionResult> GetAll()

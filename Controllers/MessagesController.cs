@@ -145,7 +145,6 @@ public class MessagesController : ControllerBase
             readAt = null
         };
 
-        // 🔹 pasiimam sender vardą notificationui
         var sender = await _db.b_users
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.UserId == userId.Value, ct);
@@ -157,7 +156,6 @@ public class MessagesController : ControllerBase
         if (string.IsNullOrWhiteSpace(senderName))
             senderName = $"User #{userId.Value}";
 
-        // 🔹 trumpinam tekstą notificationui
         var preview = messageText.Length > 120
             ? messageText.Substring(0, 120) + "..."
             : messageText;
@@ -189,7 +187,7 @@ public class MessagesController : ControllerBase
             IsRead = message.isRead,
             ReadAt = message.readAt,
             SenderName = senderName,
-            ReceiverName = "" // gali pasidaryti jei reikia
+            ReceiverName = "" 
         });
     }
 

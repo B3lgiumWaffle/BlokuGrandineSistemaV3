@@ -264,10 +264,21 @@ export default function MyInquiryDetails() {
         setDraftReqs((prev) => prev.filter((_, i) => i !== idx));
     };
 
+    const proposedAmount = Number(draftPrice);
+    const hasValidDraftPrice =
+        draftPrice.trim() !== "" &&
+        Number.isFinite(proposedAmount) &&
+        proposedAmount > 0;
+
     const canSave =
+        hasValidDraftPrice &&
         draftDesc.trim().length > 0 &&
         draftReqs.length > 0 &&
-        draftReqs.every((r) => r.description.trim().length > 0);
+        draftReqs.every(
+            (r) =>
+                r.description.trim().length > 0 &&
+                r.forseenCompletionDate.trim().length > 0
+        );
 
     const onSave = async () => {
         try {
@@ -506,6 +517,7 @@ export default function MyInquiryDetails() {
                                         value={draftPrice}
                                         onChange={(e) => setDraftPrice(e.target.value)}
                                         fullWidth
+                                        required
                                         type="number"
                                         inputProps={{ min: 0, step: "0.01" }}
                                         InputProps={{
@@ -522,6 +534,7 @@ export default function MyInquiryDetails() {
                                         value={draftDesc}
                                         onChange={(e) => setDraftDesc(e.target.value)}
                                         fullWidth
+                                        required
                                         multiline
                                         minRows={3}
                                     />
@@ -659,6 +672,7 @@ export default function MyInquiryDetails() {
                                                         value={r.description}
                                                         onChange={(e) => setReqField(idx, "description", e.target.value)}
                                                         fullWidth
+                                                        required
                                                         multiline
                                                         minRows={2}
                                                     />
@@ -671,6 +685,7 @@ export default function MyInquiryDetails() {
                                                         value={r.forseenCompletionDate || ""}
                                                         onChange={(e) => setReqField(idx, "forseenCompletionDate", e.target.value)}
                                                         fullWidth
+                                                        required
                                                         InputLabelProps={{ shrink: true }}
                                                     />
                                                 </Grid>

@@ -142,8 +142,11 @@ public class AuthController : ControllerBase
 
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest req)
+    public IActionResult Register([FromBody] RegisterRequest req)
     {
+        return StatusCode(StatusCodes.Status403Forbidden, new { message = "Registration is currently disabled." });
+
+        /*
         // 1) paprasta validacija
         var username = (req.Username ?? "").Trim();
         var email = (req.Email ?? "").Trim();
@@ -204,6 +207,7 @@ public class AuthController : ControllerBase
             email = user.Email,
             role = role.RoleName
         });
+        */
     }
 
     private string CreateResetToken(b_user user)

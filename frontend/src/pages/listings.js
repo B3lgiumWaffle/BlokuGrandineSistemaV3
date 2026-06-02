@@ -224,10 +224,21 @@ function InquiryModal({
         onClose?.();
     };
 
+    const proposedAmount = Number(proposedSum);
+    const hasValidProposedSum =
+        proposedSum.trim() !== "" &&
+        Number.isFinite(proposedAmount) &&
+        proposedAmount > 0;
+
     const canSubmit =
         listingId != null &&
+        hasValidProposedSum &&
         description.trim().length > 0 &&
-        requirements.every((r) => r.description.trim().length > 0);
+        requirements.every(
+            (r) =>
+                r.description.trim().length > 0 &&
+                r.forseenCompletionDate.trim().length > 0
+        );
 
     const contractTermRows = [
         {
@@ -359,6 +370,7 @@ function InquiryModal({
                                         value={proposedSum}
                                         onChange={(e) => setProposedSum(e.target.value)}
                                         fullWidth
+                                        required
                                         type="number"
                                         inputProps={{ min: 0, step: "0.01" }}
                                         InputProps={{
@@ -395,6 +407,7 @@ function InquiryModal({
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
                                         fullWidth
+                                        required
                                         multiline
                                         minRows={6}
                                         placeholder="Explain your task, expected outcome, tone, scope, deadlines, and any important details the provider should know before accepting."
@@ -610,6 +623,7 @@ function InquiryModal({
                                                 value={req.description}
                                                 onChange={(e) => setReqField(idx, "description", e.target.value)}
                                                 fullWidth
+                                                required
                                                 multiline
                                                 minRows={3}
                                                 placeholder="E.g. I want X, Y, Z..."
@@ -625,6 +639,7 @@ function InquiryModal({
                                                     setReqField(idx, "forseenCompletionDate", e.target.value)
                                                 }
                                                 fullWidth
+                                                required
                                                 InputLabelProps={{ shrink: true }}
                                             />
                                         </Grid>

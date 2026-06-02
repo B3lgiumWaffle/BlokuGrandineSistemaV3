@@ -239,9 +239,10 @@ export default function SentInquiryDetails() {
     const canAccept = item?.lastModifiedBy === "OWNER" && !item?.isConfirmed;
     const canModifyOrDecline = !item?.isConfirmed;
 
-    const proposedAmount = Number(draftPrice);
+    const draftPriceText = String(draftPrice ?? "");
+    const proposedAmount = Number(draftPriceText);
     const hasValidDraftPrice =
-        draftPrice.trim() !== "" &&
+        draftPriceText.trim() !== "" &&
         Number.isFinite(proposedAmount) &&
         proposedAmount > 0;
 
@@ -252,7 +253,7 @@ export default function SentInquiryDetails() {
         draftReqs.every(
             (r) =>
                 r.description.trim().length > 0 &&
-                r.forseenCompletionDate.trim().length > 0
+                String(r.forseenCompletionDate ?? "").trim().length > 0
         );
 
     const onSave = async () => {

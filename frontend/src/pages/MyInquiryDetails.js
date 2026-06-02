@@ -264,9 +264,10 @@ export default function MyInquiryDetails() {
         setDraftReqs((prev) => prev.filter((_, i) => i !== idx));
     };
 
-    const proposedAmount = Number(draftPrice);
+    const draftPriceText = String(draftPrice ?? "");
+    const proposedAmount = Number(draftPriceText);
     const hasValidDraftPrice =
-        draftPrice.trim() !== "" &&
+        draftPriceText.trim() !== "" &&
         Number.isFinite(proposedAmount) &&
         proposedAmount > 0;
 
@@ -277,7 +278,7 @@ export default function MyInquiryDetails() {
         draftReqs.every(
             (r) =>
                 r.description.trim().length > 0 &&
-                r.forseenCompletionDate.trim().length > 0
+                String(r.forseenCompletionDate ?? "").trim().length > 0
         );
 
     const onSave = async () => {
